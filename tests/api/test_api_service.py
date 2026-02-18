@@ -106,6 +106,42 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(reloaded_run["state"], "applied")
             self.assertEqual(reloaded_run["snapshot_id"], applied["snapshot_id"])
 
+    def test_persists_publish_queue_and_published_state_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            service.mark_for_gom(
+                {
+                    "draft_id": "draft_queue",
+                    "title": "Queued Draft",
+                    "prepared_content": "Queued payload",
+                }
+            )
+            service.mark_for_gom(
+                {
+                    "draft_id": "draft_published",
+                    "title": "Published Draft",
+                    "prepared_content": "Published payload",
+                }
+            )
+            service.confirm_gom(
+                {
+                    "draft_id": "draft_published",
+                    "published_url": "https://gom.example/posts/published-draft",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            queue = reloaded.list_gom_queue()
+            published = reloaded.list_published()
+
+            self.assertEqual(queue["count"], 1)
+            self.assertEqual(queue["items"][0]["draft_id"], "draft_queue")
+            self.assertEqual(published["count"], 1)
+            self.assertEqual(published["items"][0]["draft_id"], "draft_published")
+
     def test_sensitivity_check_blocks_payload_with_secret_pattern(self):
         service = ApiService()
 

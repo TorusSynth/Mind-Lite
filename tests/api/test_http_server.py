@@ -228,6 +228,98 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(runs_resp.status, 200)
             self.assertEqual(len(runs_body["runs"]), 1)
 
+    def test_persists_publish_queue_and_published_across_server_restarts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "server-state.json"
+
+            first_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            first_thread = threading.Thread(target=first_server.serve_forever, daemon=True)
+            first_thread.start()
+            time.sleep(0.01)
+            first_host, first_port = first_server.server_address
+
+            conn = HTTPConnection(first_host, first_port, timeout=2)
+            conn.request(
+                "POST",
+                "/publish/mark-for-gom",
+                body=json.dumps(
+                    {
+                        "draft_id": "draft_queue",
+                        "title": "Queued Draft",
+                        "prepared_content": "Queued payload",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            mark_resp_1 = conn.getresponse()
+            self.assertEqual(mark_resp_1.status, 200)
+            mark_resp_1.read()
+
+            conn.request(
+                "POST",
+                "/publish/mark-for-gom",
+                body=json.dumps(
+                    {
+                        "draft_id": "draft_published",
+                        "title": "Published Draft",
+                        "prepared_content": "Published payload",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            mark_resp_2 = conn.getresponse()
+            self.assertEqual(mark_resp_2.status, 200)
+            mark_resp_2.read()
+
+            conn.request(
+                "POST",
+                "/publish/confirm-gom",
+                body=json.dumps(
+                    {
+                        "draft_id": "draft_published",
+                        "published_url": "https://gom.example/posts/published-draft",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            confirm_resp = conn.getresponse()
+            self.assertEqual(confirm_resp.status, 200)
+            confirm_resp.read()
+            conn.close()
+
+            first_server.shutdown()
+            first_server.server_close()
+            first_thread.join(timeout=1)
+
+            second_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            second_thread = threading.Thread(target=second_server.serve_forever, daemon=True)
+            second_thread.start()
+            time.sleep(0.01)
+            second_host, second_port = second_server.server_address
+
+            conn = HTTPConnection(second_host, second_port, timeout=2)
+            conn.request("GET", "/publish/gom-queue")
+            queue_resp = conn.getresponse()
+            queue_body = json.loads(queue_resp.read().decode("utf-8"))
+
+            conn.request("GET", "/publish/published")
+            published_resp = conn.getresponse()
+            published_body = json.loads(published_resp.read().decode("utf-8"))
+            conn.close()
+
+            second_server.shutdown()
+            second_server.server_close()
+            second_thread.join(timeout=1)
+
+            self.assertEqual(queue_resp.status, 200)
+            self.assertEqual(queue_body["count"], 1)
+            self.assertEqual(queue_body["items"][0]["draft_id"], "draft_queue")
+
+            self.assertEqual(published_resp.status, 200)
+            self.assertEqual(published_body["count"], 1)
+            self.assertEqual(published_body["items"][0]["draft_id"], "draft_published")
+
     def test_sensitivity_check_endpoint(self):
         payload = {
             "frontmatter": {},
