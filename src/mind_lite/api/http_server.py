@@ -35,6 +35,10 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, service.get_routing_policy())
                 return
 
+            if path == "/publish/gom-queue":
+                self._write_json(200, service.list_gom_queue())
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]
@@ -105,6 +109,15 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
             if path == "/publish/prepare":
                 try:
                     result = service.publish_prepare(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, result)
+                return
+
+            if path == "/publish/mark-for-gom":
+                try:
+                    result = service.mark_for_gom(body)
                 except ValueError as exc:
                     self._write_json(400, {"error": str(exc)})
                     return
