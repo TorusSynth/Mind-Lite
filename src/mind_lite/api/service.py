@@ -94,10 +94,25 @@ class ApiService:
         ordered = [dict(self._runs[run_id]) for run_id in sorted(self._runs.keys())]
         return {"runs": ordered}
 
-    def get_run_proposals(self, run_id: str) -> dict:
+    def get_run_proposals(self, run_id: str, filters: dict | None = None) -> dict:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
+
+        if filters is not None and not isinstance(filters, dict):
+            raise ValueError("filters must be an object")
+
+        allowed_keys = {"risk_tier", "action_mode", "status"}
+        active_filters = {}
+        for key, value in (filters or {}).items():
+            if key not in allowed_keys:
+                raise ValueError(f"unsupported proposal filter: {key}")
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"{key} filter must be a non-empty string")
+            active_filters[key] = value
+
         proposals = [dict(item) for item in self._proposals_by_run.get(run_id, [])]
+        for key, value in active_filters.items():
+            proposals = [item for item in proposals if item.get(key) == value]
         return {"run_id": run_id, "proposals": proposals}
 
     def approve_run(self, run_id: str, payload: dict) -> dict:

@@ -1,5 +1,6 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 from mind_lite.api.service import ApiService
 
@@ -9,7 +10,9 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
 
     class MindLiteHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
-            path = self.path.split("?", 1)[0]
+            parsed_url = urlsplit(self.path)
+            path = parsed_url.path
+            query = parse_qs(parsed_url.query)
 
             if path == "/health":
                 self._write_json(200, service.health())
@@ -46,10 +49,13 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]
+                filters = self._extract_proposal_filters(query)
                 try:
-                    proposals = service.get_run_proposals(run_id)
+                    proposals = service.get_run_proposals(run_id, filters)
                 except ValueError as exc:
-                    self._write_json(404, {"error": str(exc)})
+                    error_message = str(exc)
+                    status = 404 if "unknown run id" in error_message else 400
+                    self._write_json(status, {"error": error_message})
                     return
                 self._write_json(200, proposals)
                 return
@@ -228,6 +234,15 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
             if len(parts) == 4 and parts[1] == "runs" and parts[2] and parts[3]:
                 return parts[2], parts[3]
             return None
+
+        def _extract_proposal_filters(self, query: dict[str, list[str]]) -> dict:
+            filters = {}
+            for key in ("risk_tier", "action_mode", "status"):
+                values = query.get(key)
+                if not values:
+                    continue
+                filters[key] = values[-1]
+            return filters
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003
             return
