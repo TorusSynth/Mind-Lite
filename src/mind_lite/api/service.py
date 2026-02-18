@@ -552,6 +552,39 @@ class ApiService:
 
         return {"results": results}
 
+    def organize_propose_structure(self, payload: dict) -> dict:
+        notes = payload.get("notes")
+        if not isinstance(notes, list) or not notes:
+            raise ValueError("notes must be a non-empty list")
+
+        proposals = []
+        for note in notes:
+            if not isinstance(note, dict):
+                raise ValueError("each note must be an object")
+            note_id = note.get("note_id")
+            title = note.get("title")
+            folder = note.get("folder", "Inbox")
+
+            if not isinstance(note_id, str) or not note_id.strip():
+                raise ValueError("note_id is required")
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError("title is required")
+            if not isinstance(folder, str):
+                raise ValueError("folder must be a string")
+
+            proposed_folder = self._proposed_folder(title, folder)
+            proposals.append(
+                {
+                    "note_id": note_id.strip(),
+                    "current_folder": folder,
+                    "proposed_folder": proposed_folder,
+                    "reason": "folder_standardization",
+                    "action_mode": "manual",
+                }
+            )
+
+        return {"proposals": proposals}
+
     def links_propose(self, payload: dict) -> dict:
         source_note_id = payload.get("source_note_id")
         if not isinstance(source_note_id, str) or not source_note_id.strip():
@@ -723,3 +756,13 @@ class ApiService:
         if "architecture" in lowered:
             return "structural_overlap"
         return "semantic_similarity"
+
+    def _proposed_folder(self, title: str, current_folder: str) -> str:
+        lowered = title.lower()
+        if "project" in lowered or "atlas" in lowered:
+            return "Projects"
+        if "archive" in lowered:
+            return "Archive"
+        if current_folder.strip():
+            return current_folder
+        return "Resources"
