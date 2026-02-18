@@ -143,6 +143,57 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(rollback_body["run_id"], run_id)
             self.assertEqual(rollback_body["state"], "rolled_back")
 
+    def test_persists_runs_across_server_restarts_when_state_file_set(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "server-state.json"
+            notes_dir = root / "notes"
+            notes_dir.mkdir()
+            (notes_dir / "a.md").write_text("[[b]]", encoding="utf-8")
+            (notes_dir / "b.md").write_text("No links", encoding="utf-8")
+
+            first_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            first_thread = threading.Thread(target=first_server.serve_forever, daemon=True)
+            first_thread.start()
+            time.sleep(0.01)
+            first_host, first_port = first_server.server_address
+
+            conn = HTTPConnection(first_host, first_port, timeout=2)
+            payload = {"folder_path": str(notes_dir), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            analyze_resp = conn.getresponse()
+            self.assertEqual(analyze_resp.status, 200)
+            analyze_resp.read()
+            conn.close()
+
+            first_server.shutdown()
+            first_server.server_close()
+            first_thread.join(timeout=1)
+
+            second_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            second_thread = threading.Thread(target=second_server.serve_forever, daemon=True)
+            second_thread.start()
+            time.sleep(0.01)
+            second_host, second_port = second_server.server_address
+
+            conn = HTTPConnection(second_host, second_port, timeout=2)
+            conn.request("GET", "/runs")
+            runs_resp = conn.getresponse()
+            runs_body = json.loads(runs_resp.read().decode("utf-8"))
+            conn.close()
+
+            second_server.shutdown()
+            second_server.server_close()
+            second_thread.join(timeout=1)
+
+            self.assertEqual(runs_resp.status, 200)
+            self.assertEqual(len(runs_body["runs"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
