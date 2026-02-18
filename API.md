@@ -37,8 +37,12 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service core implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
+- Run proposal approval workflow implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
+- Sensitivity cloud-eligibility check endpoint implemented in `src/mind_lite/api/service.py`
+- Sensitivity policy summary endpoint implemented in `src/mind_lite/api/service.py`
+- Routing policy summary endpoint implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
@@ -48,11 +52,15 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 
 - `GET /health`
 - `GET /runs`
+- `GET /policy/sensitivity`
+- `GET /policy/routing`
 - `POST /onboarding/analyze-folder`
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/proposals`
+- `POST /runs/{run_id}/approve`
 - `POST /runs/{run_id}/apply`
 - `POST /runs/{run_id}/rollback`
+- `POST /policy/sensitivity/check`
 
 Run locally with:
 
