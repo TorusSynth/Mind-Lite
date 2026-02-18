@@ -63,6 +63,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Links apply endpoint idempotency replay behavior implemented in `src/mind_lite/api/service.py`
 - Links apply idempotency replay cache persistence implemented in `src/mind_lite/api/service.py`
 - Publish mark-for-gom idempotency replay and persistence implemented in `src/mind_lite/api/service.py`
+- Publish confirm-gom idempotency replay and persistence implemented in `src/mind_lite/api/service.py`
 - Metrics endpoint includes publish queue and published counters in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
