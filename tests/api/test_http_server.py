@@ -32,6 +32,27 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 200)
         self.assertEqual(body, {"status": "ok"})
 
+    def test_health_ready_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request("GET", "/health/ready")
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body, {"status": "ready"})
+
+    def test_metrics_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request("GET", "/metrics")
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8")
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn("mind_lite_runs_total", body)
+        self.assertIn("mind_lite_proposals_total", body)
+
     def test_runs_history_endpoint(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -253,6 +274,40 @@ class HttpServerTests(unittest.TestCase):
         self.assertIn("routing", body)
         self.assertIn("budget", body)
         self.assertEqual(body["budget"]["status"], "normal")
+
+    def test_ask_endpoint(self):
+        payload = {"query": "What should I work on?", "local_confidence": 0.55}
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/ask",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn("answer", body)
+        self.assertIn("provider_trace", body)
+        self.assertEqual(body["provider_trace"]["provider"], "openai")
+        self.assertTrue(body["provider_trace"]["fallback_used"])
+
+    def test_ask_endpoint_requires_query(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/ask",
+            body=json.dumps({}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,16 @@ class ApiServiceTests(unittest.TestCase):
         service = ApiService()
         self.assertEqual(service.health(), {"status": "ok"})
 
+    def test_health_ready_returns_ready(self):
+        service = ApiService()
+        self.assertEqual(service.health_ready(), {"status": "ready"})
+
+    def test_metrics_exposes_prometheus_text(self):
+        service = ApiService()
+        metrics = service.metrics()
+        self.assertIn("mind_lite_runs_total", metrics)
+        self.assertIn("mind_lite_proposals_total", metrics)
+
     def test_analyze_folder_creates_run_record(self):
         service = ApiService()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -130,6 +140,44 @@ class ApiServiceTests(unittest.TestCase):
         self.assertIn("budget", result)
         self.assertEqual(result["routing"]["local_confidence_threshold"], 0.70)
         self.assertEqual(result["budget"]["status"], "normal")
+
+    def test_ask_uses_openai_fallback_on_low_confidence_when_allowed(self):
+        service = ApiService()
+
+        result = service.ask({"query": "What should I work on?", "local_confidence": 0.55})
+
+        self.assertIn("answer", result)
+        self.assertIn("provider_trace", result)
+        self.assertEqual(result["provider_trace"]["provider"], "openai")
+        self.assertTrue(result["provider_trace"]["fallback_used"])
+        self.assertEqual(result["provider_trace"]["fallback_reason"], "low_confidence")
+
+    def test_ask_blocks_cloud_fallback_when_sensitivity_fails(self):
+        service = ApiService()
+
+        result = service.ask(
+            {
+                "query": "Can I send this?",
+                "local_confidence": 0.20,
+                "content": "OPENAI_API_KEY=sk-test-1234",
+            }
+        )
+
+        self.assertEqual(result["provider_trace"]["provider"], "local")
+        self.assertFalse(result["provider_trace"]["fallback_used"])
+        self.assertEqual(result["provider_trace"]["fallback_reason"], "cloud_blocked")
+        self.assertFalse(result["sensitivity"]["allowed"])
+
+    def test_ask_forces_local_when_budget_is_hard_stop(self):
+        service = ApiService()
+        service._monthly_spend = service._monthly_budget_cap
+
+        result = service.ask({"query": "Need help", "local_timed_out": True})
+
+        self.assertEqual(result["budget"]["status"], "hard_stop")
+        self.assertEqual(result["provider_trace"]["provider"], "local")
+        self.assertFalse(result["provider_trace"]["fallback_used"])
+        self.assertEqual(result["provider_trace"]["fallback_reason"], "cloud_blocked")
 
 
 if __name__ == "__main__":
