@@ -32,6 +32,32 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 200)
         self.assertEqual(body, {"status": "ok"})
 
+    def test_runs_history_endpoint(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            analyze_resp = conn.getresponse()
+            self.assertEqual(analyze_resp.status, 200)
+            analyze_resp.read()
+
+            conn.request("GET", "/runs")
+            runs_resp = conn.getresponse()
+            runs_body = json.loads(runs_resp.read().decode("utf-8"))
+            conn.close()
+
+            self.assertEqual(runs_resp.status, 200)
+            self.assertEqual(len(runs_body["runs"]), 1)
+
     def test_analyze_and_get_run_endpoints(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

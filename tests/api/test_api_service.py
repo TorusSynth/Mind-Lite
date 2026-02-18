@@ -57,6 +57,40 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(rollback_result["state"], "rolled_back")
             self.assertEqual(rollback_result["rolled_back_snapshot_id"], apply_result["snapshot_id"])
 
+    def test_list_runs_returns_created_runs(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            first = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            second = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+
+            listed = service.list_runs()
+            listed_ids = [item["run_id"] for item in listed["runs"]]
+            self.assertEqual(listed_ids, [first["run_id"], second["run_id"]])
+
+    def test_persists_runs_and_snapshots_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+            notes_dir = root / "notes"
+            notes_dir.mkdir()
+            (notes_dir / "a.md").write_text("[[b]]", encoding="utf-8")
+            (notes_dir / "b.md").write_text("No links", encoding="utf-8")
+
+            service = ApiService(state_file=str(state_file))
+            run = service.analyze_folder({"folder_path": str(notes_dir), "mode": "analyze"})
+            applied = service.apply_run(run["run_id"], {"change_types": ["tag_enrichment"]})
+
+            reloaded = ApiService(state_file=str(state_file))
+            reloaded_run = reloaded.get_run(run["run_id"])
+
+            self.assertEqual(reloaded_run["run_id"], run["run_id"])
+            self.assertEqual(reloaded_run["state"], "applied")
+            self.assertEqual(reloaded_run["snapshot_id"], applied["snapshot_id"])
+
 
 if __name__ == "__main__":
     unittest.main()
