@@ -54,6 +54,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Publish confirmation endpoint implemented in `src/mind_lite/api/service.py`
 - Published listing endpoint implemented in `src/mind_lite/api/service.py`
 - Organize classify endpoint implemented in `src/mind_lite/api/service.py`
+- Links propose endpoint implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
@@ -71,6 +72,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `GET /publish/published`
 - `POST /onboarding/analyze-folder`
 - `POST /organize/classify`
+- `POST /links/propose`
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/proposals`
 - `POST /runs/{run_id}/approve`
