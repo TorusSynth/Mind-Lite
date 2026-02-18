@@ -14,13 +14,35 @@ Implementation has not started. This is the contract to build against.
 
 ---
 
+## Scope
+
+### In Scope
+
+- Endpoint behavior contracts for v1 planning baseline
+- Run lifecycle and proposal workflow operations
+- Local-first routing, cloud fallback gate, and editorial gate surfaces
+
+### Out of Scope
+
+- Internal implementation details (see `ARCHITECTURE.md`)
+- Capability sequencing and delivery order (see `ROADMAP.md`)
+- Future provider expansions beyond v1 fallback policy
+
+---
+
 ## Core Design Rules
 
 - Local-first provider routing
 - Explicit human review for structural actions
-- Policy-gated cloud fallback
+- Policy-gated cloud fallback (OpenAI only in v1)
 - Batch-safe operations with rollback support
 - Obsidian compatibility preservation
+
+Terminology alignment:
+
+- **Hybrid automation** uses risk-tiered action modes (`auto`, `suggest`, `manual`)
+- **Cloud fallback gate** allows non-local provider use only when triggers pass policy
+- **Editorial gate** blocks publication until quality and safety requirements pass
 
 ---
 
@@ -257,3 +279,11 @@ Confirm publication status and URL.
 - This contract is intentionally more focused than v1.0 docs.
 - Endpoints may be expanded during build, but core policy behavior is considered locked.
 - Any contract-breaking changes require documentation review before coding.
+
+---
+
+## Read Next
+
+1. `ARCHITECTURE.md` for component boundaries behind these endpoints
+2. `ROADMAP.md` for capability phase progression
+3. `docs/specs/provenance-lineage-contract.md` for source and traceability guarantees

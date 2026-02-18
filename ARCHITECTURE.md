@@ -11,6 +11,37 @@ Deliver a trustworthy second brain workflow for Obsidian vaults by combining saf
 
 ---
 
+## Purpose
+
+This document defines the system boundaries and major engines for Mind Lite v1. It translates roadmap capabilities into component responsibilities.
+
+---
+
+## Scope
+
+### In Scope
+
+- Component-level responsibilities and interfaces
+- Run lifecycle and failure states
+- Routing, privacy, and editorial gate behavior at system level
+
+### Out of Scope
+
+- Endpoint request/response contracts (see `API.md`)
+- Phase sequencing details (see `ROADMAP.md`)
+- Step-by-step build tasks (see `docs/plans/`)
+
+---
+
+## Terminology Contract
+
+- **Hybrid automation** = low-risk auto + medium-risk suggest + high-risk manual
+- **Local-first routing** = LM Studio default for model execution
+- **Cloud fallback gate** = OpenAI fallback only when policy triggers are met
+- **Editorial gate** = quality and safety checks before GOM publication
+
+---
+
 ## System Overview
 
 ```
@@ -168,3 +199,11 @@ Failure states:
 Implementation follows capability phases defined in `ROADMAP.md`.
 
 Coding begins only after documentation approval.
+
+---
+
+## Read Next
+
+1. `API.md` for endpoint-level behavior contracts
+2. `ROADMAP.md` for capability sequencing and exit criteria
+3. `docs/specs/threat-model-v1.md` for policy-level risk controls
