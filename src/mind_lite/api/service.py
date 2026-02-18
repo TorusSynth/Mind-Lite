@@ -443,6 +443,47 @@ class ApiService:
             "items": items,
         }
 
+    def export_for_gom(self, payload: dict) -> dict:
+        draft_id = payload.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            raise ValueError("draft_id is required")
+
+        export_format = payload.get("format")
+        if not isinstance(export_format, str) or not export_format.strip():
+            raise ValueError("format is required")
+
+        if export_format not in {"markdown", "html", "json"}:
+            raise ValueError("format must be one of: markdown, html, json")
+
+        matched = None
+        for item in self._gom_queue:
+            if item.get("draft_id") == draft_id.strip():
+                matched = item
+                break
+
+        if matched is None:
+            raise ValueError(f"unknown draft id: {draft_id}")
+
+        artifact = matched["prepared_content"]
+        if export_format == "html":
+            artifact = f"<p>{matched['prepared_content']}</p>"
+        elif export_format == "json":
+            artifact = json.dumps(
+                {
+                    "draft_id": matched["draft_id"],
+                    "title": matched["title"],
+                    "prepared_content": matched["prepared_content"],
+                },
+                sort_keys=True,
+            )
+
+        return {
+            "draft_id": matched["draft_id"],
+            "format": export_format,
+            "status": "export_ready",
+            "artifact": artifact,
+        }
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
