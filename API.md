@@ -328,6 +328,9 @@ Mark draft as publish candidate.
 ### GET `/publish/gom-queue`
 List queued publish candidates.
 
+### GET `/publish/published`
+List published drafts with final URLs.
+
 ### POST `/publish/export-for-gom`
 Export markdown/html/json after gate pass.
 
