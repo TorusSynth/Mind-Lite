@@ -241,6 +241,39 @@ class ApiServiceTests(unittest.TestCase):
             self.assertTrue(replayed["idempotency"]["duplicate"])
             self.assertEqual(replayed["applied_links"], first["applied_links"])
 
+    def test_persists_publish_confirm_idempotency_replay_cache_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            service.mark_for_gom(
+                {
+                    "draft_id": "draft_030",
+                    "title": "Atlas Publish",
+                    "prepared_content": "Ready to publish.",
+                }
+            )
+            first = service.confirm_gom(
+                {
+                    "draft_id": "draft_030",
+                    "published_url": "https://gom.example/posts/atlas-publish",
+                    "event_id": "evt_confirm_001",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            replayed = reloaded.confirm_gom(
+                {
+                    "draft_id": "draft_999",
+                    "published_url": "https://gom.example/posts/other",
+                    "event_id": "evt_confirm_001",
+                }
+            )
+
+            self.assertTrue(replayed["idempotency"]["duplicate"])
+            self.assertEqual(replayed["draft_id"], first["draft_id"])
+
     def test_persists_publish_mark_idempotency_replay_cache_to_state_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -513,6 +546,35 @@ class ApiServiceTests(unittest.TestCase):
                     "published_url": "https://gom.example/posts/missing",
                 }
             )
+
+    def test_confirm_gom_replays_same_response_for_duplicate_event_id(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_030",
+                "title": "Atlas Publish",
+                "prepared_content": "Ready to publish.",
+            }
+        )
+
+        first = service.confirm_gom(
+            {
+                "draft_id": "draft_030",
+                "published_url": "https://gom.example/posts/atlas-publish",
+                "event_id": "evt_confirm_001",
+            }
+        )
+        second = service.confirm_gom(
+            {
+                "draft_id": "draft_999",
+                "published_url": "https://gom.example/posts/other",
+                "event_id": "evt_confirm_001",
+            }
+        )
+
+        self.assertFalse(first["idempotency"]["duplicate"])
+        self.assertTrue(second["idempotency"]["duplicate"])
+        self.assertEqual(second["draft_id"], first["draft_id"])
 
     def test_list_published_returns_confirmed_items(self):
         service = ApiService()
