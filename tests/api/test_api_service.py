@@ -46,6 +46,11 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(listed["run_id"], run_id)
             self.assertGreaterEqual(len(listed["proposals"]), 1)
 
+            approve_result = service.approve_run(run_id, {"change_types": ["tag_enrichment"]})
+            self.assertEqual(approve_result["run_id"], run_id)
+            self.assertEqual(approve_result["state"], "approved")
+            self.assertGreaterEqual(approve_result["approved_count"], 1)
+
             apply_result = service.apply_run(run_id, {"change_types": ["tag_enrichment"]})
             self.assertEqual(apply_result["run_id"], run_id)
             self.assertEqual(apply_result["state"], "applied")

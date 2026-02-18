@@ -111,6 +111,19 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(list_resp.status, 200)
             self.assertEqual(listed["run_id"], run_id)
 
+            approve_payload = {"change_types": ["tag_enrichment"]}
+            conn.request(
+                "POST",
+                f"/runs/{run_id}/approve",
+                body=json.dumps(approve_payload),
+                headers={"Content-Type": "application/json"},
+            )
+            approve_resp = conn.getresponse()
+            approved = json.loads(approve_resp.read().decode("utf-8"))
+            self.assertEqual(approve_resp.status, 200)
+            self.assertEqual(approved["run_id"], run_id)
+            self.assertEqual(approved["state"], "approved")
+
             apply_payload = {"change_types": ["tag_enrichment"]}
             conn.request(
                 "POST",
