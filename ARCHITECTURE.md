@@ -17,6 +17,13 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 
 ---
 
+## Phase A Implementation Status
+
+- Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
+- Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
+
+---
+
 ## Scope
 
 ### In Scope

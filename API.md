@@ -14,6 +14,13 @@ Implementation has not started. This is the contract to build against.
 
 ---
 
+## Phase A Implementation Status
+
+- Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
+- Contract tests implemented in `tests/contracts/test_action_tiering_policy.py`
+
+---
+
 ## Scope
 
 ### In Scope
