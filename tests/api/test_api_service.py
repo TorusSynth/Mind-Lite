@@ -241,6 +241,34 @@ class ApiServiceTests(unittest.TestCase):
             self.assertTrue(replayed["idempotency"]["duplicate"])
             self.assertEqual(replayed["applied_links"], first["applied_links"])
 
+    def test_persists_publish_mark_idempotency_replay_cache_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            first = service.mark_for_gom(
+                {
+                    "draft_id": "draft_010",
+                    "title": "Project Atlas Weekly",
+                    "prepared_content": "Ready for export.",
+                    "event_id": "evt_publish_001",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            replayed = reloaded.mark_for_gom(
+                {
+                    "draft_id": "draft_011",
+                    "title": "Different Draft",
+                    "prepared_content": "Should be ignored on duplicate event id.",
+                    "event_id": "evt_publish_001",
+                }
+            )
+
+            self.assertTrue(replayed["idempotency"]["duplicate"])
+            self.assertEqual(replayed["draft_id"], first["draft_id"])
+
     def test_sensitivity_check_blocks_payload_with_secret_pattern(self):
         service = ApiService()
 
@@ -404,6 +432,30 @@ class ApiServiceTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             service.mark_for_gom({"draft_id": "draft_011", "title": "Missing content"})
+
+    def test_mark_for_gom_replays_same_response_for_duplicate_event_id(self):
+        service = ApiService()
+
+        first = service.mark_for_gom(
+            {
+                "draft_id": "draft_010",
+                "title": "Project Atlas Weekly",
+                "prepared_content": "Ready for export.",
+                "event_id": "evt_publish_001",
+            }
+        )
+        second = service.mark_for_gom(
+            {
+                "draft_id": "draft_011",
+                "title": "Different Draft",
+                "prepared_content": "Should be ignored on duplicate event id.",
+                "event_id": "evt_publish_001",
+            }
+        )
+
+        self.assertFalse(first["idempotency"]["duplicate"])
+        self.assertTrue(second["idempotency"]["duplicate"])
+        self.assertEqual(second["draft_id"], first["draft_id"])
 
     def test_export_for_gom_returns_export_payload_for_queued_draft(self):
         service = ApiService()

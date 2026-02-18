@@ -515,6 +515,73 @@ class HttpServerTests(unittest.TestCase):
             self.assertTrue(second_body["idempotency"]["duplicate"])
             self.assertEqual(second_body["applied_links"], first_body["applied_links"])
 
+    def test_persists_publish_mark_idempotency_replay_across_server_restarts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "server-state.json"
+
+            first_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            first_thread = threading.Thread(target=first_server.serve_forever, daemon=True)
+            first_thread.start()
+            time.sleep(0.01)
+            first_host, first_port = first_server.server_address
+
+            conn = HTTPConnection(first_host, first_port, timeout=2)
+            conn.request(
+                "POST",
+                "/publish/mark-for-gom",
+                body=json.dumps(
+                    {
+                        "draft_id": "draft_010",
+                        "title": "Project Atlas Weekly",
+                        "prepared_content": "Ready for export.",
+                        "event_id": "evt_publish_001",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            first_resp = conn.getresponse()
+            first_body = json.loads(first_resp.read().decode("utf-8"))
+            self.assertEqual(first_resp.status, 200)
+            self.assertFalse(first_body["idempotency"]["duplicate"])
+            conn.close()
+
+            first_server.shutdown()
+            first_server.server_close()
+            first_thread.join(timeout=1)
+
+            second_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            second_thread = threading.Thread(target=second_server.serve_forever, daemon=True)
+            second_thread.start()
+            time.sleep(0.01)
+            second_host, second_port = second_server.server_address
+
+            conn = HTTPConnection(second_host, second_port, timeout=2)
+            conn.request(
+                "POST",
+                "/publish/mark-for-gom",
+                body=json.dumps(
+                    {
+                        "draft_id": "draft_011",
+                        "title": "Different Draft",
+                        "prepared_content": "Should be ignored on duplicate event id.",
+                        "event_id": "evt_publish_001",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            second_resp = conn.getresponse()
+            second_body = json.loads(second_resp.read().decode("utf-8"))
+            conn.close()
+
+            second_server.shutdown()
+            second_server.server_close()
+            second_thread.join(timeout=1)
+
+            self.assertEqual(second_resp.status, 200)
+            self.assertTrue(second_body["idempotency"]["duplicate"])
+            self.assertEqual(second_body["draft_id"], first_body["draft_id"])
+
     def test_sensitivity_check_endpoint(self):
         payload = {
             "frontmatter": {},
@@ -752,6 +819,45 @@ class HttpServerTests(unittest.TestCase):
 
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
+
+    def test_mark_for_gom_replays_duplicate_event_id(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        first_payload = {
+            "draft_id": "draft_010",
+            "title": "Project Atlas Weekly",
+            "prepared_content": "Ready for export.",
+            "event_id": "evt_publish_001",
+        }
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(first_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        first_resp = conn.getresponse()
+        first_body = json.loads(first_resp.read().decode("utf-8"))
+        self.assertEqual(first_resp.status, 200)
+        self.assertFalse(first_body["idempotency"]["duplicate"])
+
+        second_payload = {
+            "draft_id": "draft_011",
+            "title": "Different Draft",
+            "prepared_content": "Should be ignored on duplicate event id.",
+            "event_id": "evt_publish_001",
+        }
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(second_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        second_resp = conn.getresponse()
+        second_body = json.loads(second_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(second_resp.status, 200)
+        self.assertTrue(second_body["idempotency"]["duplicate"])
+        self.assertEqual(second_body["draft_id"], first_body["draft_id"])
 
     def test_export_for_gom_endpoint(self):
         conn = HTTPConnection(self.host, self.port, timeout=2)
