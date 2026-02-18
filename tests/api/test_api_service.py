@@ -96,6 +96,41 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(reloaded_run["state"], "applied")
             self.assertEqual(reloaded_run["snapshot_id"], applied["snapshot_id"])
 
+    def test_sensitivity_check_blocks_payload_with_secret_pattern(self):
+        service = ApiService()
+
+        result = service.check_sensitivity(
+            {
+                "frontmatter": {},
+                "tags": ["project"],
+                "path": "Projects/Atlas/notes.md",
+                "content": "OPENAI_API_KEY=sk-test-1234",
+            }
+        )
+
+        self.assertFalse(result["allowed"])
+        self.assertIn("blocked_by_regex_pattern", result["reasons"])
+
+    def test_sensitivity_policy_summary_exposes_active_rules(self):
+        service = ApiService()
+
+        result = service.get_sensitivity_policy()
+
+        self.assertIn("protected_tags", result)
+        self.assertIn("protected_path_prefixes", result)
+        self.assertIn("secret_pattern_count", result)
+        self.assertGreaterEqual(result["secret_pattern_count"], 1)
+
+    def test_routing_policy_summary_exposes_budget_and_thresholds(self):
+        service = ApiService()
+
+        result = service.get_routing_policy()
+
+        self.assertIn("routing", result)
+        self.assertIn("budget", result)
+        self.assertEqual(result["routing"]["local_confidence_threshold"], 0.70)
+        self.assertEqual(result["budget"]["status"], "normal")
+
 
 if __name__ == "__main__":
     unittest.main()

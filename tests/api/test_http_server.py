@@ -207,6 +207,53 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(runs_resp.status, 200)
             self.assertEqual(len(runs_body["runs"]), 1)
 
+    def test_sensitivity_check_endpoint(self):
+        payload = {
+            "frontmatter": {},
+            "tags": ["project"],
+            "path": "Projects/Atlas/notes.md",
+            "content": "OPENAI_API_KEY=sk-test-1234",
+        }
+
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/policy/sensitivity/check",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertFalse(body["allowed"])
+        self.assertIn("blocked_by_regex_pattern", body["reasons"])
+
+    def test_sensitivity_policy_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request("GET", "/policy/sensitivity")
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn("protected_tags", body)
+        self.assertIn("protected_path_prefixes", body)
+        self.assertIn("secret_pattern_count", body)
+
+    def test_routing_policy_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request("GET", "/policy/routing")
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn("routing", body)
+        self.assertIn("budget", body)
+        self.assertEqual(body["budget"]["status"], "normal")
+
 
 if __name__ == "__main__":
     unittest.main()
