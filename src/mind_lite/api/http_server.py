@@ -4,8 +4,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from mind_lite.api.service import ApiService
 
 
-def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
-    service = ApiService()
+def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | None = None) -> ThreadingHTTPServer:
+    service = ApiService(state_file=state_file)
 
     class MindLiteHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
