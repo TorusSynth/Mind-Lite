@@ -46,6 +46,8 @@ class ApiService:
         run_count = len(self._runs)
         proposal_count = sum(len(items) for items in self._proposals_by_run.values())
         snapshot_count = len(self._snapshot_store.export_records())
+        publish_queue_count = len(self._gom_queue)
+        published_count = len(self._gom_published)
         lines = [
             "# HELP mind_lite_runs_total Total runs recorded",
             "# TYPE mind_lite_runs_total gauge",
@@ -56,6 +58,12 @@ class ApiService:
             "# HELP mind_lite_snapshots_total Total snapshots recorded",
             "# TYPE mind_lite_snapshots_total gauge",
             f"mind_lite_snapshots_total {snapshot_count}",
+            "# HELP mind_lite_publish_queue_total Total drafts queued for publish",
+            "# TYPE mind_lite_publish_queue_total gauge",
+            f"mind_lite_publish_queue_total {publish_queue_count}",
+            "# HELP mind_lite_publish_published_total Total drafts published",
+            "# TYPE mind_lite_publish_published_total gauge",
+            f"mind_lite_publish_published_total {published_count}",
             "",
         ]
         return "\n".join(lines)
