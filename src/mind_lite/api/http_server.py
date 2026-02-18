@@ -15,6 +15,10 @@ def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPSer
                 self._write_json(200, service.health())
                 return
 
+            if path == "/runs":
+                self._write_json(200, service.list_runs())
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]

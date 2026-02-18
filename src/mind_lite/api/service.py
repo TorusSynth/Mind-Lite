@@ -1,4 +1,6 @@
 from dataclasses import asdict
+import json
+from pathlib import Path
 
 from mind_lite.contracts.action_tiering import decide_action_mode
 from mind_lite.contracts.rollback_validation import validate_rollback_request
@@ -7,11 +9,13 @@ from mind_lite.onboarding.analyze_readonly import analyze_folder
 
 
 class ApiService:
-    def __init__(self) -> None:
+    def __init__(self, state_file: str | None = None) -> None:
         self._runs: dict[str, dict] = {}
         self._proposals_by_run: dict[str, list[dict]] = {}
         self._snapshot_store = SnapshotStore()
         self._run_counter = 0
+        self._state_file = Path(state_file) if state_file is not None else None
+        self._load_state_if_present()
 
     def health(self) -> dict:
         return {"status": "ok"}
@@ -30,12 +34,17 @@ class ApiService:
         }
         self._runs[run_id] = run
         self._proposals_by_run[run_id] = self._build_initial_proposals(run_id)
+        self._persist_state()
         return run
 
     def get_run(self, run_id: str) -> dict:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
         return dict(self._runs[run_id])
+
+    def list_runs(self) -> dict:
+        ordered = [dict(self._runs[run_id]) for run_id in sorted(self._runs.keys())]
+        return {"runs": ordered}
 
     def get_run_proposals(self, run_id: str) -> dict:
         if run_id not in self._runs:
@@ -75,6 +84,7 @@ class ApiService:
         run = self._runs[run_id]
         run["state"] = "applied"
         run["snapshot_id"] = snapshot.snapshot_id
+        self._persist_state()
 
         return {
             "run_id": run_id,
@@ -101,6 +111,7 @@ class ApiService:
         run = self._runs[run_id]
         run["state"] = "rolled_back"
         run["rolled_back_snapshot_id"] = requested_snapshot
+        self._persist_state()
 
         return {
             "run_id": run_id,
@@ -111,6 +122,38 @@ class ApiService:
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
+
+    def _load_state_if_present(self) -> None:
+        if self._state_file is None or not self._state_file.exists():
+            return
+        payload = json.loads(self._state_file.read_text(encoding="utf-8"))
+        self._run_counter = int(payload.get("run_counter", 0))
+        self._runs = {
+            key: dict(value)
+            for key, value in payload.get("runs", {}).items()
+            if isinstance(value, dict)
+        }
+        self._proposals_by_run = {
+            key: [dict(item) for item in value]
+            for key, value in payload.get("proposals", {}).items()
+            if isinstance(value, list)
+        }
+        snapshot_payload = payload.get("snapshots", {})
+        if isinstance(snapshot_payload, dict):
+            self._snapshot_store.import_records(snapshot_payload)
+
+    def _persist_state(self) -> None:
+        if self._state_file is None:
+            return
+        if self._state_file.parent != Path(""):
+            self._state_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "run_counter": self._run_counter,
+            "runs": self._runs,
+            "proposals": self._proposals_by_run,
+            "snapshots": self._snapshot_store.export_records(),
+        }
+        self._state_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     def _build_initial_proposals(self, run_id: str) -> list[dict]:
         proposal_specs = [
