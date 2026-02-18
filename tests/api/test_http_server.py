@@ -476,6 +476,66 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_confirm_gom_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        mark_payload = {
+            "draft_id": "draft_030",
+            "title": "Atlas Publish",
+            "prepared_content": "Ready to publish.",
+        }
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(mark_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp = conn.getresponse()
+        self.assertEqual(mark_resp.status, 200)
+        mark_resp.read()
+
+        confirm_payload = {
+            "draft_id": "draft_030",
+            "published_url": "https://gom.example/posts/atlas-publish",
+        }
+        conn.request(
+            "POST",
+            "/publish/confirm-gom",
+            body=json.dumps(confirm_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        confirm_resp = conn.getresponse()
+        confirm_body = json.loads(confirm_resp.read().decode("utf-8"))
+        self.assertEqual(confirm_resp.status, 200)
+        self.assertEqual(confirm_body["status"], "published")
+
+        conn.request("GET", "/publish/gom-queue")
+        queue_resp = conn.getresponse()
+        queue_body = json.loads(queue_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(queue_resp.status, 200)
+        self.assertEqual(queue_body["count"], 0)
+
+    def test_confirm_gom_endpoint_requires_known_draft(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/confirm-gom",
+            body=json.dumps(
+                {
+                    "draft_id": "missing",
+                    "published_url": "https://gom.example/posts/missing",
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()

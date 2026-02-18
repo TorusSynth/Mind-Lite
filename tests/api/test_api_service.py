@@ -271,6 +271,40 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.export_for_gom({"draft_id": "missing", "format": "markdown"})
 
+    def test_confirm_gom_marks_queue_item_as_published(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_030",
+                "title": "Atlas Publish",
+                "prepared_content": "Ready to publish.",
+            }
+        )
+
+        result = service.confirm_gom(
+            {
+                "draft_id": "draft_030",
+                "published_url": "https://gom.example/posts/atlas-publish",
+            }
+        )
+        queue = service.list_gom_queue()
+
+        self.assertEqual(result["draft_id"], "draft_030")
+        self.assertEqual(result["status"], "published")
+        self.assertEqual(result["published_url"], "https://gom.example/posts/atlas-publish")
+        self.assertEqual(queue["count"], 0)
+
+    def test_confirm_gom_rejects_unknown_draft(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.confirm_gom(
+                {
+                    "draft_id": "missing",
+                    "published_url": "https://gom.example/posts/missing",
+                }
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
