@@ -17,11 +17,15 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 
 ---
 
-## Phase A Implementation Status
+## Implementation Status (Phases A-B)
+
+Detailed endpoint-level status is recorded in `API.md`; this section tracks architecture-relevant milestones.
 
 - Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
 - Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
 - Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
+- Coverage added in `tests/onboarding/test_analyze_readonly.py`
+- Onboarding note-level profile extraction implemented in `src/mind_lite/onboarding/analyze_readonly.py`
 - Coverage added in `tests/onboarding/test_analyze_readonly.py`
 - Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
 - Coverage added in `tests/contracts/test_run_lifecycle_policy.py`
@@ -41,6 +45,10 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - API service state with optional file persistence implemented in `src/mind_lite/api/service.py`
 - Publish export-for-gom idempotency replay and persistence implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
+- Onboarding LLM proposal normalization implemented in `src/mind_lite/onboarding/proposal_llm.py`
+- Coverage added in `tests/onboarding/test_proposal_llm.py`
+- Analyze-folder note-candidate proposal generation implemented in `src/mind_lite/api/service.py`
+- Analyze-folder diagnostics and all-fail transition to `failed_needs_attention` implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
@@ -228,7 +236,7 @@ Failure states:
 
 Implementation follows capability phases defined in `ROADMAP.md`.
 
-Coding begins only after documentation approval.
+Coding started after documentation approval and now proceeds by capability phase.
 
 ---
 

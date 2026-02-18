@@ -14,26 +14,27 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 
 ---
 
-## Phase A Implementation Status
+## Implementation Status (Phases A-B)
 
 - Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
-- Contract tests implemented in `tests/contracts/test_action_tiering_policy.py`
+- Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
 - Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
-- Contract tests implemented in `tests/onboarding/test_analyze_readonly.py`
+- Contract coverage added in `tests/onboarding/test_analyze_readonly.py`
+- Onboarding note-level profile metadata extraction implemented in `src/mind_lite/onboarding/analyze_readonly.py`
 - Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
-- Contract tests implemented in `tests/contracts/test_run_lifecycle_policy.py`
+- Contract coverage added in `tests/contracts/test_run_lifecycle_policy.py`
 - Sensitivity gate cloud-eligibility contract implemented in `src/mind_lite/contracts/sensitivity_gate.py`
-- Contract tests implemented in `tests/contracts/test_sensitivity_gate_policy.py`
+- Contract coverage added in `tests/contracts/test_sensitivity_gate_policy.py`
 - Budget guardrails contract implemented in `src/mind_lite/contracts/budget_guardrails.py`
-- Contract tests implemented in `tests/contracts/test_budget_guardrails_policy.py`
+- Contract coverage added in `tests/contracts/test_budget_guardrails_policy.py`
 - Snapshot rollback contract implemented in `src/mind_lite/contracts/snapshot_rollback.py`
-- Contract tests implemented in `tests/contracts/test_snapshot_rollback_policy.py`
+- Contract coverage added in `tests/contracts/test_snapshot_rollback_policy.py`
 - Provider routing fallback contract implemented in `src/mind_lite/contracts/provider_routing.py`
-- Contract tests implemented in `tests/contracts/test_provider_routing_policy.py`
+- Contract coverage added in `tests/contracts/test_provider_routing_policy.py`
 - Idempotency replay contract implemented in `src/mind_lite/contracts/idempotency_replay.py`
-- Contract tests implemented in `tests/contracts/test_idempotency_replay_policy.py`
+- Contract coverage added in `tests/contracts/test_idempotency_replay_policy.py`
 - Rollback validation invariants contract implemented in `src/mind_lite/contracts/rollback_validation.py`
-- Contract tests implemented in `tests/contracts/test_rollback_validation_policy.py`
+- Contract coverage added in `tests/contracts/test_rollback_validation_policy.py`
 - Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service core implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
@@ -59,6 +60,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Links propose endpoint implemented in `src/mind_lite/api/service.py`
 - Links apply endpoint implemented in `src/mind_lite/api/service.py`
 - Organize propose-structure endpoint implemented in `src/mind_lite/api/service.py`
+- Onboarding LLM proposal normalization module implemented in `src/mind_lite/onboarding/proposal_llm.py`
+- Onboarding LLM proposal parser tests implemented in `tests/onboarding/test_proposal_llm.py`
+- Analyze-folder note-candidate proposal integration implemented in `src/mind_lite/api/service.py`
+- Analyze-folder partial/all-failure diagnostics and `failed_needs_attention` handling implemented in `src/mind_lite/api/service.py`
 - Ask endpoint idempotency replay behavior implemented in `src/mind_lite/api/service.py`
 - Ask idempotency replay cache persistence implemented in `src/mind_lite/api/service.py`
 - Links apply endpoint idempotency replay behavior implemented in `src/mind_lite/api/service.py`

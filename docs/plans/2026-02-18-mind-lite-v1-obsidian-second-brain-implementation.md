@@ -66,3 +66,12 @@ Before implementation starts:
 This plan intentionally prioritizes trust and usability over aggressive autonomy.
 
 Coding should begin only after documentation approval.
+
+---
+
+## Implementation Status Update (2026-02-18)
+
+- Phase B onboarding now includes note-level profile extraction in `src/mind_lite/onboarding/analyze_readonly.py`.
+- LLM onboarding proposal parsing and normalization is implemented in `src/mind_lite/onboarding/proposal_llm.py`.
+- `POST /onboarding/analyze-folder` now supports note-candidate proposal generation with diagnostics in `src/mind_lite/api/service.py`.
+- Analyze runs now enter `failed_needs_attention` when all note-candidate generation paths fail.
