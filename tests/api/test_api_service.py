@@ -522,11 +522,61 @@ class ApiServiceTests(unittest.TestCase):
         self.assertEqual(exported["status"], "export_ready")
         self.assertIn("artifact", exported)
 
+    def test_export_for_gom_replays_same_response_for_duplicate_event_id(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_020",
+                "title": "Atlas Release",
+                "prepared_content": "Ready to publish.",
+            }
+        )
+
+        first = service.export_for_gom(
+            {
+                "draft_id": "draft_020",
+                "format": "markdown",
+                "event_id": "evt_export_001",
+            }
+        )
+        second = service.export_for_gom(
+            {
+                "draft_id": "missing",
+                "format": "html",
+                "event_id": "evt_export_001",
+            }
+        )
+
+        self.assertFalse(first["idempotency"]["duplicate"])
+        self.assertTrue(second["idempotency"]["duplicate"])
+        self.assertEqual(second["draft_id"], first["draft_id"])
+        self.assertEqual(second["format"], first["format"])
+        self.assertEqual(second["artifact"], first["artifact"])
+
     def test_export_for_gom_rejects_unknown_draft(self):
         service = ApiService()
 
         with self.assertRaises(ValueError):
             service.export_for_gom({"draft_id": "missing", "format": "markdown"})
+
+    def test_export_for_gom_rejects_blank_event_id(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_020",
+                "title": "Atlas Release",
+                "prepared_content": "Ready to publish.",
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "event_id"):
+            service.export_for_gom(
+                {
+                    "draft_id": "draft_020",
+                    "format": "markdown",
+                    "event_id": "   ",
+                }
+            )
 
     def test_confirm_gom_marks_queue_item_as_published(self):
         service = ApiService()
@@ -729,6 +779,43 @@ class ApiServiceTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             service.organize_propose_structure({"notes": []})
+
+
+class ApiServiceStatePersistenceTests(unittest.TestCase):
+    def test_persists_publish_export_idempotency_replay_cache_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            service.mark_for_gom(
+                {
+                    "draft_id": "draft_020",
+                    "title": "Atlas Release",
+                    "prepared_content": "Ready to publish.",
+                }
+            )
+            first = service.export_for_gom(
+                {
+                    "draft_id": "draft_020",
+                    "format": "markdown",
+                    "event_id": "evt_export_001",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            replayed = reloaded.export_for_gom(
+                {
+                    "draft_id": "draft_999",
+                    "format": "html",
+                    "event_id": "evt_export_001",
+                }
+            )
+
+            self.assertTrue(replayed["idempotency"]["duplicate"])
+            self.assertEqual(replayed["draft_id"], first["draft_id"])
+            self.assertEqual(replayed["format"], first["format"])
+            self.assertEqual(replayed["artifact"], first["artifact"])
 
 
 if __name__ == "__main__":
