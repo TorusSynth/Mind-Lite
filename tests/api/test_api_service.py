@@ -483,6 +483,28 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.links_apply({"source_note_id": "n1", "links": []})
 
+    def test_links_apply_replays_same_response_for_duplicate_event_id(self):
+        service = ApiService()
+
+        first = service.links_apply(
+            {
+                "source_note_id": "n1",
+                "links": [{"target_note_id": "n2", "confidence": 0.9}],
+                "event_id": "evt_links_001",
+            }
+        )
+        second = service.links_apply(
+            {
+                "source_note_id": "n1",
+                "links": [{"target_note_id": "n3", "confidence": 0.1}],
+                "event_id": "evt_links_001",
+            }
+        )
+
+        self.assertFalse(first["idempotency"]["duplicate"])
+        self.assertTrue(second["idempotency"]["duplicate"])
+        self.assertEqual(second["applied_links"], first["applied_links"])
+
     def test_organize_propose_structure_returns_manual_suggestions(self):
         service = ApiService()
 

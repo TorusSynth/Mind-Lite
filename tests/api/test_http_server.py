@@ -885,6 +885,43 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_links_apply_endpoint_replays_duplicate_event_id(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        first_payload = {
+            "source_note_id": "n1",
+            "links": [{"target_note_id": "n2", "confidence": 0.9}],
+            "event_id": "evt_links_001",
+        }
+        conn.request(
+            "POST",
+            "/links/apply",
+            body=json.dumps(first_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        first_resp = conn.getresponse()
+        first_body = json.loads(first_resp.read().decode("utf-8"))
+        self.assertEqual(first_resp.status, 200)
+        self.assertFalse(first_body["idempotency"]["duplicate"])
+
+        second_payload = {
+            "source_note_id": "n1",
+            "links": [{"target_note_id": "n3", "confidence": 0.1}],
+            "event_id": "evt_links_001",
+        }
+        conn.request(
+            "POST",
+            "/links/apply",
+            body=json.dumps(second_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        second_resp = conn.getresponse()
+        second_body = json.loads(second_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(second_resp.status, 200)
+        self.assertTrue(second_body["idempotency"]["duplicate"])
+        self.assertEqual(second_body["applied_links"], first_body["applied_links"])
+
     def test_organize_propose_structure_endpoint(self):
         conn = HTTPConnection(self.host, self.port, timeout=2)
         payload = {
