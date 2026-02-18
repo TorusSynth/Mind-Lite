@@ -180,6 +180,16 @@ class HttpServerTests(unittest.TestCase):
 
                 conn.request(
                     "POST",
+                    f"/runs/{second_run['run_id']}/approve",
+                    body=json.dumps({"change_types": ["tag_enrichment"]}),
+                    headers={"Content-Type": "application/json"},
+                )
+                approve_resp = conn.getresponse()
+                self.assertEqual(approve_resp.status, 200)
+                approve_resp.read()
+
+                conn.request(
+                    "POST",
                     f"/runs/{second_run['run_id']}/apply",
                     body=json.dumps({"change_types": ["tag_enrichment"]}),
                     headers={"Content-Type": "application/json"},
@@ -225,6 +235,58 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(run_resp.status, 200)
             self.assertEqual(run_body["run_id"], run_id)
             self.assertEqual(run_body["profile"]["note_count"], 2)
+
+    def test_analyze_folder_endpoint_returns_staged_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = json.loads(resp.read().decode("utf-8"))
+            conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn(body["state"], {"ready_safe_auto", "awaiting_review"})
+
+    def test_apply_endpoint_rejects_unapproved_run_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            analyze_resp = conn.getresponse()
+            analyzed = json.loads(analyze_resp.read().decode("utf-8"))
+            self.assertEqual(analyze_resp.status, 200)
+
+            conn.request(
+                "POST",
+                f"/runs/{analyzed['run_id']}/apply",
+                body=json.dumps({"change_types": ["tag_enrichment"]}),
+                headers={"Content-Type": "application/json"},
+            )
+            apply_resp = conn.getresponse()
+            apply_body = json.loads(apply_resp.read().decode("utf-8"))
+            conn.close()
+
+        self.assertEqual(apply_resp.status, 400)
+        self.assertIn("run state must be approved", apply_body["error"])
 
     def test_analyze_folder_endpoint_empty_directory_returns_no_proposals(self):
         with tempfile.TemporaryDirectory() as temp_dir:

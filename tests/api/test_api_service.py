@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from mind_lite.api.service import ApiService
 
@@ -70,12 +71,78 @@ class ApiServiceTests(unittest.TestCase):
             result = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
 
             self.assertIn("run_id", result)
-            self.assertEqual(result["state"], "analyzing")
+            self.assertEqual(result["state"], "ready_safe_auto")
             self.assertEqual(result["profile"]["note_count"], 2)
 
             stored = service.get_run(result["run_id"])
             self.assertEqual(stored["run_id"], result["run_id"])
-            self.assertEqual(stored["state"], "analyzing")
+            self.assertEqual(stored["state"], "ready_safe_auto")
+
+    def test_analyze_folder_sets_ready_safe_auto_when_auto_proposals_exist(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") == "atlas":
+                return (
+                    '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                    '"risk_tier":"low","confidence":0.91,"details":{"reason":"safe_auto"}}]}'
+                )
+            return '{"proposals": []}'
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas", encoding="utf-8")
+            (root / "other.md").write_text("# Other", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+
+        self.assertEqual(run["state"], "ready_safe_auto")
+
+    def test_analyze_folder_sets_awaiting_review_when_no_auto_proposals(self):
+        service = ApiService()
+        transitions: list[tuple[str, str]] = []
+
+        from mind_lite.contracts.run_lifecycle import validate_transition as lifecycle_validate_transition
+
+        def record_validate_transition(current, target):
+            transitions.append((current.value, target.value))
+            return lifecycle_validate_transition(current, target)
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") == "atlas":
+                return (
+                    '{"proposals":[{"note_id":"atlas","change_type":"link_add",'
+                    '"risk_tier":"medium","confidence":0.75,"details":{"reason":"needs_review"}}]}'
+                )
+            if note.get("note_id") == "guide":
+                return (
+                    '{"proposals":[{"note_id":"guide","change_type":"tag_enrichment",'
+                    '"risk_tier":"low","confidence":0.79,"details":{"reason":"manual_check"}}]}'
+                )
+            return '{"proposals": []}'
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with patch("mind_lite.api.service.validate_transition", side_effect=record_validate_transition):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "atlas.md").write_text("# Atlas", encoding="utf-8")
+                (root / "guide.md").write_text("# Guide", encoding="utf-8")
+
+                run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+
+        self.assertEqual(run["state"], "awaiting_review")
+        self.assertEqual(
+            transitions,
+            [
+                ("queued", "analyzing"),
+                ("analyzing", "awaiting_review"),
+            ],
+        )
 
     def test_analyze_folder_default_candidate_generation_returns_usable_proposals(self):
         service = ApiService()
@@ -87,7 +154,7 @@ class ApiServiceTests(unittest.TestCase):
             run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
             proposals = service.get_run_proposals(run["run_id"])["proposals"]
 
-        self.assertEqual(run["state"], "analyzing")
+        self.assertEqual(run["state"], "ready_safe_auto")
         self.assertEqual(len(proposals), 1)
         self.assertEqual(proposals[0]["note_id"], "a")
         self.assertEqual(proposals[0]["change_type"], "tag_enrichment")
@@ -95,13 +162,29 @@ class ApiServiceTests(unittest.TestCase):
 
     def test_analyze_folder_empty_directory_returns_no_proposals(self):
         service = ApiService()
+        transitions: list[tuple[str, str]] = []
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            run = service.analyze_folder({"folder_path": temp_dir, "mode": "analyze"})
-            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+        from mind_lite.contracts.run_lifecycle import validate_transition as lifecycle_validate_transition
+
+        def record_validate_transition(current, target):
+            transitions.append((current.value, target.value))
+            return lifecycle_validate_transition(current, target)
+
+        with patch("mind_lite.api.service.validate_transition", side_effect=record_validate_transition):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                run = service.analyze_folder({"folder_path": temp_dir, "mode": "analyze"})
+                proposals = service.get_run_proposals(run["run_id"])["proposals"]
 
         self.assertEqual(run["profile"]["note_count"], 0)
+        self.assertEqual(run["state"], "awaiting_review")
         self.assertEqual(len(proposals), 0)
+        self.assertEqual(
+            transitions,
+            [
+                ("queued", "analyzing"),
+                ("analyzing", "awaiting_review"),
+            ],
+        )
 
     def test_get_run_returns_defensive_copy_for_nested_state(self):
         service = ApiService()
@@ -165,6 +248,88 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(rollback_result["run_id"], run_id)
             self.assertEqual(rollback_result["state"], "rolled_back")
             self.assertEqual(rollback_result["rolled_back_snapshot_id"], apply_result["snapshot_id"])
+
+    def test_approve_run_rejects_invalid_run_state(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            return (
+                '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"safe_auto"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas", encoding="utf-8")
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+
+        service._runs[run["run_id"]]["state"] = "analyzing"
+        with self.assertRaisesRegex(ValueError, "run state"):
+            service.approve_run(run["run_id"], {"change_types": ["tag_enrichment"]})
+
+    def test_apply_run_rejects_invalid_run_state(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            return (
+                '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"safe_auto"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas", encoding="utf-8")
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+
+        with self.assertRaisesRegex(ValueError, "run state"):
+            service.apply_run(run["run_id"], {"change_types": ["tag_enrichment"]})
+
+    def test_staged_run_progression_analyze_approve_apply(self):
+        service = ApiService()
+        transitions: list[tuple[str, str]] = []
+
+        from mind_lite.contracts.run_lifecycle import validate_transition as lifecycle_validate_transition
+
+        def record_validate_transition(current, target):
+            transitions.append((current.value, target.value))
+            return lifecycle_validate_transition(current, target)
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            return (
+                '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"safe_auto"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with patch("mind_lite.api.service.validate_transition", side_effect=record_validate_transition):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "atlas.md").write_text("# Atlas", encoding="utf-8")
+
+                run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+                approved = service.approve_run(run["run_id"], {"change_types": ["tag_enrichment"]})
+                applied = service.apply_run(run["run_id"], {"change_types": ["tag_enrichment"]})
+
+        self.assertEqual(approved["state"], "approved")
+        self.assertEqual(applied["state"], "applied")
+        self.assertEqual(
+            transitions,
+            [
+                ("queued", "analyzing"),
+                ("analyzing", "ready_safe_auto"),
+                ("ready_safe_auto", "awaiting_review"),
+                ("awaiting_review", "approved"),
+                ("approved", "applied"),
+            ],
+        )
 
     def test_get_run_proposals_supports_filters(self):
         service = ApiService()
@@ -271,7 +436,7 @@ class ApiServiceTests(unittest.TestCase):
             run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
             proposals = service.get_run_proposals(run["run_id"])["proposals"]
 
-        self.assertEqual(run["state"], "analyzing")
+        self.assertEqual(run["state"], "ready_safe_auto")
         self.assertEqual(len(proposals), 1)
         self.assertEqual(proposals[0]["note_id"], "atlas")
         self.assertEqual(len(run["diagnostics"]), 1)
@@ -405,6 +570,7 @@ class ApiServiceTests(unittest.TestCase):
 
             first = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
             second = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            service.approve_run(second["run_id"], {"change_types": ["tag_enrichment"]})
             service.apply_run(second["run_id"], {"change_types": ["tag_enrichment"]})
 
             filtered = service.list_runs({"state": "applied"})
@@ -450,6 +616,7 @@ class ApiServiceTests(unittest.TestCase):
             service._generate_note_candidate_response = stub_note_llm_response
 
             run = service.analyze_folder({"folder_path": str(notes_dir), "mode": "analyze"})
+            service.approve_run(run["run_id"], {"change_types": ["tag_enrichment"]})
             applied = service.apply_run(run["run_id"], {"change_types": ["tag_enrichment"]})
 
             reloaded = ApiService(state_file=str(state_file))
