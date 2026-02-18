@@ -50,6 +50,18 @@ class ApiServiceTests(unittest.TestCase):
 
     def test_analyze_folder_creates_run_record(self):
         service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             (root / "a.md").write_text("[[b]]", encoding="utf-8")
@@ -65,6 +77,48 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(stored["run_id"], result["run_id"])
             self.assertEqual(stored["state"], "analyzing")
 
+    def test_analyze_folder_default_candidate_generation_returns_usable_proposals(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("# Atlas\nInitial content", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["state"], "analyzing")
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(proposals[0]["note_id"], "a")
+        self.assertEqual(proposals[0]["change_type"], "tag_enrichment")
+        self.assertEqual(proposals[0]["risk_tier"], "low")
+
+    def test_analyze_folder_empty_directory_returns_no_proposals(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run = service.analyze_folder({"folder_path": temp_dir, "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["profile"]["note_count"], 0)
+        self.assertEqual(len(proposals), 0)
+
+    def test_get_run_returns_defensive_copy_for_nested_state(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            fetched = service.get_run(run["run_id"])
+            original_count = fetched["profile"]["note_count"]
+
+            fetched["profile"]["note_count"] = 999
+            reread = service.get_run(run["run_id"])
+
+            self.assertEqual(reread["profile"]["note_count"], original_count)
+
     def test_invalid_folder_raises_value_error(self):
         service = ApiService()
         with self.assertRaises(ValueError):
@@ -72,6 +126,18 @@ class ApiServiceTests(unittest.TestCase):
 
     def test_proposals_list_and_apply_flow(self):
         service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             (root / "a.md").write_text("[[b]]", encoding="utf-8")
@@ -102,6 +168,18 @@ class ApiServiceTests(unittest.TestCase):
 
     def test_get_run_proposals_supports_filters(self):
         service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             (root / "a.md").write_text("[[b]]", encoding="utf-8")
@@ -119,6 +197,179 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(len(approved_only["proposals"]), 1)
             self.assertEqual(approved_only["proposals"][0]["status"], "approved")
 
+    def test_get_run_proposals_returns_defensive_copy_for_nested_state(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            return (
+                '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas\nInitial content", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])
+            self.assertEqual(len(proposals["proposals"]), 1)
+
+            proposals["proposals"][0]["details"]["reason"] = "mutated"
+            reread = service.get_run_proposals(run["run_id"])
+
+            self.assertEqual(reread["proposals"][0]["details"]["reason"], "add_missing_tags")
+
+    def test_analyze_folder_populates_proposals_from_note_candidates(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") != "atlas":
+                return "{\"proposals\": []}"
+            return (
+                '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas\nInitial content", encoding="utf-8")
+            (root / "other.md").write_text("# Other\nNo links", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        atlas_proposal = next((item for item in proposals if item.get("note_id") == "atlas"), None)
+        self.assertIsNotNone(atlas_proposal)
+        self.assertEqual(atlas_proposal["change_type"], "tag_enrichment")
+        self.assertEqual(atlas_proposal["details"], {"reason": "add_missing_tags"})
+
+    def test_analyze_folder_handles_partial_note_failures(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") == "atlas":
+                return (
+                    '{"proposals":[{"note_id":"atlas","change_type":"tag_enrichment",'
+                    '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+                )
+            return "not-json"
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "atlas.md").write_text("# Atlas\nInitial content", encoding="utf-8")
+            (root / "broken.md").write_text("# Broken\nInitial content", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["state"], "analyzing")
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(proposals[0]["note_id"], "atlas")
+        self.assertEqual(len(run["diagnostics"]), 1)
+        self.assertEqual(run["diagnostics"][0]["note_id"], "broken")
+        self.assertIn("error", run["diagnostics"][0])
+
+    def test_analyze_folder_sets_failed_needs_attention_when_all_notes_fail(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") == "broken_one":
+                raise RuntimeError("candidate generation timeout")
+            return "not-json"
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "broken_one.md").write_text("# Broken one", encoding="utf-8")
+            (root / "broken_two.md").write_text("# Broken two", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            stored = service.get_run(run["run_id"])
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["state"], "failed_needs_attention")
+        self.assertEqual(stored["state"], "failed_needs_attention")
+        self.assertEqual(proposals, [])
+        self.assertEqual(len(run["diagnostics"]), 2)
+
+    def test_analyze_folder_sets_failed_needs_attention_for_empty_or_non_string_candidate_output(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str):
+            self.assertTrue(prompt)
+            if note.get("note_id") == "empty":
+                return ""
+            if note.get("note_id") == "blank":
+                return "   "
+            return 123
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "empty.md").write_text("# Empty", encoding="utf-8")
+            (root / "blank.md").write_text("# Blank", encoding="utf-8")
+            (root / "non_string.md").write_text("# Non String", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["state"], "failed_needs_attention")
+        self.assertEqual(proposals, [])
+        self.assertEqual(len(run["diagnostics"]), 3)
+        diagnostics_by_note_id = {diag["note_id"]: diag for diag in run["diagnostics"]}
+        self.assertEqual(
+            diagnostics_by_note_id["empty"]["stage"],
+            "candidate_generation_empty_output",
+        )
+        self.assertEqual(
+            diagnostics_by_note_id["blank"]["stage"],
+            "candidate_generation_empty_output",
+        )
+        self.assertEqual(
+            diagnostics_by_note_id["non_string"]["stage"],
+            "candidate_generation_empty_output",
+        )
+
+    def test_analyze_folder_treats_empty_candidate_list_as_no_success(self):
+        service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") == "empty_list":
+                return '{"proposals": []}'
+            return "not-json"
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "empty_list.md").write_text("# Empty list", encoding="utf-8")
+            (root / "broken.md").write_text("# Broken", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            proposals = service.get_run_proposals(run["run_id"])["proposals"]
+
+        self.assertEqual(run["state"], "failed_needs_attention")
+        self.assertEqual(proposals, [])
+        self.assertEqual(len(run["diagnostics"]), 2)
+        diagnostics_by_note_id = {diag["note_id"]: diag for diag in run["diagnostics"]}
+        self.assertEqual(
+            diagnostics_by_note_id["empty_list"]["stage"],
+            "candidate_parse_empty_candidates",
+        )
+
     def test_list_runs_returns_created_runs(self):
         service = ApiService()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -135,6 +386,18 @@ class ApiServiceTests(unittest.TestCase):
 
     def test_list_runs_supports_state_filter(self):
         service = ApiService()
+
+        def stub_note_llm_response(note: dict, prompt: str) -> str:
+            self.assertTrue(prompt)
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+            )
+
+        service._generate_note_candidate_response = stub_note_llm_response
+
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             (root / "a.md").write_text("[[b]]", encoding="utf-8")
@@ -148,6 +411,22 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(len(filtered["runs"]), 1)
             self.assertEqual(filtered["runs"][0]["run_id"], second["run_id"])
 
+    def test_list_runs_returns_defensive_copy_for_nested_state(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            listed = service.list_runs()
+            original_count = listed["runs"][0]["profile"]["note_count"]
+
+            listed["runs"][0]["profile"]["note_count"] = 123
+            reread = service.get_run(run["run_id"])
+
+            self.assertEqual(reread["profile"]["note_count"], original_count)
+
     def test_persists_runs_and_snapshots_to_state_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -158,6 +437,18 @@ class ApiServiceTests(unittest.TestCase):
             (notes_dir / "b.md").write_text("No links", encoding="utf-8")
 
             service = ApiService(state_file=str(state_file))
+
+            def stub_note_llm_response(note: dict, prompt: str) -> str:
+                self.assertTrue(prompt)
+                if note.get("note_id") != "a":
+                    return '{"proposals": []}'
+                return (
+                    '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                    '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
+                )
+
+            service._generate_note_candidate_response = stub_note_llm_response
+
             run = service.analyze_folder({"folder_path": str(notes_dir), "mode": "analyze"})
             applied = service.apply_run(run["run_id"], {"change_types": ["tag_enrichment"]})
 

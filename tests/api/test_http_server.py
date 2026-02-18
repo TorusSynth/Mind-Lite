@@ -5,7 +5,9 @@ import time
 import unittest
 from http.client import HTTPConnection
 from pathlib import Path
+from unittest.mock import patch
 
+from mind_lite.api.service import ApiService
 from mind_lite.api.http_server import create_server
 
 
@@ -138,47 +140,58 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(len(runs_body["runs"]), 1)
 
     def test_runs_history_endpoint_supports_state_filter(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            (root / "a.md").write_text("[[b]]", encoding="utf-8")
-            (root / "b.md").write_text("No links", encoding="utf-8")
-
-            conn = HTTPConnection(self.host, self.port, timeout=2)
-            payload = {"folder_path": str(root), "mode": "analyze"}
-            conn.request(
-                "POST",
-                "/onboarding/analyze-folder",
-                body=json.dumps(payload),
-                headers={"Content-Type": "application/json"},
+        def stub_note_llm_response(self, note: dict, prompt: str) -> str:
+            del self
+            del prompt
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
             )
-            first_resp = conn.getresponse()
-            first_run = json.loads(first_resp.read().decode("utf-8"))
-            self.assertEqual(first_resp.status, 200)
 
-            conn.request(
-                "POST",
-                "/onboarding/analyze-folder",
-                body=json.dumps(payload),
-                headers={"Content-Type": "application/json"},
-            )
-            second_resp = conn.getresponse()
-            second_run = json.loads(second_resp.read().decode("utf-8"))
-            self.assertEqual(second_resp.status, 200)
+        with patch.object(ApiService, "_generate_note_candidate_response", stub_note_llm_response):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "a.md").write_text("[[b]]", encoding="utf-8")
+                (root / "b.md").write_text("No links", encoding="utf-8")
 
-            conn.request(
-                "POST",
-                f"/runs/{second_run['run_id']}/apply",
-                body=json.dumps({"change_types": ["tag_enrichment"]}),
-                headers={"Content-Type": "application/json"},
-            )
-            apply_resp = conn.getresponse()
-            self.assertEqual(apply_resp.status, 200)
-            apply_resp.read()
+                conn = HTTPConnection(self.host, self.port, timeout=2)
+                payload = {"folder_path": str(root), "mode": "analyze"}
+                conn.request(
+                    "POST",
+                    "/onboarding/analyze-folder",
+                    body=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                first_resp = conn.getresponse()
+                first_run = json.loads(first_resp.read().decode("utf-8"))
+                self.assertEqual(first_resp.status, 200)
 
-            conn.request("GET", "/runs?state=applied")
-            filtered_resp = conn.getresponse()
-            filtered_body = json.loads(filtered_resp.read().decode("utf-8"))
-            conn.close()
+                conn.request(
+                    "POST",
+                    "/onboarding/analyze-folder",
+                    body=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                second_resp = conn.getresponse()
+                second_run = json.loads(second_resp.read().decode("utf-8"))
+                self.assertEqual(second_resp.status, 200)
+
+                conn.request(
+                    "POST",
+                    f"/runs/{second_run['run_id']}/apply",
+                    body=json.dumps({"change_types": ["tag_enrichment"]}),
+                    headers={"Content-Type": "application/json"},
+                )
+                apply_resp = conn.getresponse()
+                self.assertEqual(apply_resp.status, 200)
+                apply_resp.read()
+
+                conn.request("GET", "/runs?state=applied")
+                filtered_resp = conn.getresponse()
+                filtered_body = json.loads(filtered_resp.read().decode("utf-8"))
+                conn.close()
 
             self.assertEqual(filtered_resp.status, 200)
             self.assertEqual(len(filtered_body["runs"]), 1)
@@ -213,82 +226,186 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(run_body["run_id"], run_id)
             self.assertEqual(run_body["profile"]["note_count"], 2)
 
-    def test_proposals_and_apply_endpoints(self):
+    def test_analyze_folder_endpoint_empty_directory_returns_no_proposals(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            (root / "a.md").write_text("[[b]]", encoding="utf-8")
-            (root / "b.md").write_text("No links", encoding="utf-8")
-
             conn = HTTPConnection(self.host, self.port, timeout=2)
-            payload = {"folder_path": str(root), "mode": "analyze"}
+            payload = {"folder_path": temp_dir, "mode": "analyze"}
             conn.request(
                 "POST",
                 "/onboarding/analyze-folder",
                 body=json.dumps(payload),
                 headers={"Content-Type": "application/json"},
             )
-            analyzed_resp = conn.getresponse()
-            analyzed = json.loads(analyzed_resp.read().decode("utf-8"))
-            self.assertEqual(analyzed_resp.status, 200)
-            run_id = analyzed["run_id"]
+            analyze_resp = conn.getresponse()
+            analyze_body = json.loads(analyze_resp.read().decode("utf-8"))
+            self.assertEqual(analyze_resp.status, 200)
+            self.assertEqual(analyze_body["profile"]["note_count"], 0)
 
+            run_id = analyze_body["run_id"]
             conn.request("GET", f"/runs/{run_id}/proposals")
-            list_resp = conn.getresponse()
-            listed = json.loads(list_resp.read().decode("utf-8"))
-            self.assertEqual(list_resp.status, 200)
-            self.assertEqual(listed["run_id"], run_id)
-
-            conn.request("GET", f"/runs/{run_id}/proposals?risk_tier=low")
-            filtered_resp = conn.getresponse()
-            filtered = json.loads(filtered_resp.read().decode("utf-8"))
-            self.assertEqual(filtered_resp.status, 200)
-            self.assertEqual(len(filtered["proposals"]), 1)
-            self.assertEqual(filtered["proposals"][0]["risk_tier"], "low")
-
-            approve_payload = {"change_types": ["tag_enrichment"]}
-            conn.request(
-                "POST",
-                f"/runs/{run_id}/approve",
-                body=json.dumps(approve_payload),
-                headers={"Content-Type": "application/json"},
-            )
-            approve_resp = conn.getresponse()
-            approved = json.loads(approve_resp.read().decode("utf-8"))
-            self.assertEqual(approve_resp.status, 200)
-            self.assertEqual(approved["run_id"], run_id)
-            self.assertEqual(approved["state"], "approved")
-
-            apply_payload = {"change_types": ["tag_enrichment"]}
-            conn.request(
-                "POST",
-                f"/runs/{run_id}/apply",
-                body=json.dumps(apply_payload),
-                headers={"Content-Type": "application/json"},
-            )
-            apply_resp = conn.getresponse()
-            applied = json.loads(apply_resp.read().decode("utf-8"))
+            proposals_resp = conn.getresponse()
+            proposals_body = json.loads(proposals_resp.read().decode("utf-8"))
             conn.close()
 
-            self.assertEqual(apply_resp.status, 200)
-            self.assertEqual(applied["run_id"], run_id)
-            self.assertEqual(applied["state"], "applied")
-            self.assertIn("snapshot_id", applied)
+        self.assertEqual(proposals_resp.status, 200)
+        self.assertEqual(len(proposals_body["proposals"]), 0)
 
-            rollback_payload = {"snapshot_id": applied["snapshot_id"]}
-            conn = HTTPConnection(self.host, self.port, timeout=2)
-            conn.request(
-                "POST",
-                f"/runs/{run_id}/rollback",
-                body=json.dumps(rollback_payload),
-                headers={"Content-Type": "application/json"},
+    def test_analyze_folder_endpoint_reports_failed_needs_attention_when_all_notes_fail(self):
+        def stub_note_llm_response(self, note: dict, prompt: str) -> str:
+            del self
+            del prompt
+            if note.get("note_id") == "broken_one":
+                raise RuntimeError("candidate generation timeout")
+            return "not-json"
+
+        with patch.object(ApiService, "_generate_note_candidate_response", stub_note_llm_response):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "broken_one.md").write_text("# Broken one", encoding="utf-8")
+                (root / "broken_two.md").write_text("# Broken two", encoding="utf-8")
+
+                conn = HTTPConnection(self.host, self.port, timeout=2)
+                payload = {"folder_path": str(root), "mode": "analyze"}
+                conn.request(
+                    "POST",
+                    "/onboarding/analyze-folder",
+                    body=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                resp = conn.getresponse()
+                body = json.loads(resp.read().decode("utf-8"))
+                conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["state"], "failed_needs_attention")
+        self.assertEqual(len(body["diagnostics"]), 2)
+
+    def test_analyze_folder_endpoint_reports_failed_needs_attention_for_empty_or_blank_candidate_output(self):
+        def stub_note_llm_response(self, note: dict, prompt: str):
+            del self
+            del prompt
+            if note.get("note_id") == "empty":
+                return ""
+            return "   "
+
+        with patch.object(ApiService, "_generate_note_candidate_response", stub_note_llm_response):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "empty.md").write_text("# Empty", encoding="utf-8")
+                (root / "blank.md").write_text("# Blank", encoding="utf-8")
+
+                conn = HTTPConnection(self.host, self.port, timeout=2)
+                payload = {"folder_path": str(root), "mode": "analyze"}
+                conn.request(
+                    "POST",
+                    "/onboarding/analyze-folder",
+                    body=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                resp = conn.getresponse()
+                body = json.loads(resp.read().decode("utf-8"))
+                conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["state"], "failed_needs_attention")
+        self.assertEqual(len(body["diagnostics"]), 2)
+        diagnostics_by_note_id = {diag["note_id"]: diag for diag in body["diagnostics"]}
+        self.assertEqual(
+            diagnostics_by_note_id["empty"]["stage"],
+            "candidate_generation_empty_output",
+        )
+        self.assertEqual(
+            diagnostics_by_note_id["blank"]["stage"],
+            "candidate_generation_empty_output",
+        )
+
+    def test_proposals_and_apply_endpoints(self):
+        def stub_note_llm_response(self, note: dict, prompt: str) -> str:
+            del self
+            del prompt
+            if note.get("note_id") != "a":
+                return '{"proposals": []}'
+            return (
+                '{"proposals":[{"note_id":"a","change_type":"tag_enrichment",'
+                '"risk_tier":"low","confidence":0.91,"details":{"reason":"add_missing_tags"}}]}'
             )
-            rollback_resp = conn.getresponse()
-            rollback_body = json.loads(rollback_resp.read().decode("utf-8"))
-            conn.close()
 
-            self.assertEqual(rollback_resp.status, 200)
-            self.assertEqual(rollback_body["run_id"], run_id)
-            self.assertEqual(rollback_body["state"], "rolled_back")
+        with patch.object(ApiService, "_generate_note_candidate_response", stub_note_llm_response):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "a.md").write_text("[[b]]", encoding="utf-8")
+                (root / "b.md").write_text("No links", encoding="utf-8")
+
+                conn = HTTPConnection(self.host, self.port, timeout=2)
+                payload = {"folder_path": str(root), "mode": "analyze"}
+                conn.request(
+                    "POST",
+                    "/onboarding/analyze-folder",
+                    body=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                analyzed_resp = conn.getresponse()
+                analyzed = json.loads(analyzed_resp.read().decode("utf-8"))
+                self.assertEqual(analyzed_resp.status, 200)
+                run_id = analyzed["run_id"]
+
+                conn.request("GET", f"/runs/{run_id}/proposals")
+                list_resp = conn.getresponse()
+                listed = json.loads(list_resp.read().decode("utf-8"))
+                self.assertEqual(list_resp.status, 200)
+                self.assertEqual(listed["run_id"], run_id)
+
+                conn.request("GET", f"/runs/{run_id}/proposals?risk_tier=low")
+                filtered_resp = conn.getresponse()
+                filtered = json.loads(filtered_resp.read().decode("utf-8"))
+                self.assertEqual(filtered_resp.status, 200)
+                self.assertEqual(len(filtered["proposals"]), 1)
+                self.assertEqual(filtered["proposals"][0]["risk_tier"], "low")
+
+                approve_payload = {"change_types": ["tag_enrichment"]}
+                conn.request(
+                    "POST",
+                    f"/runs/{run_id}/approve",
+                    body=json.dumps(approve_payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                approve_resp = conn.getresponse()
+                approved = json.loads(approve_resp.read().decode("utf-8"))
+                self.assertEqual(approve_resp.status, 200)
+                self.assertEqual(approved["run_id"], run_id)
+                self.assertEqual(approved["state"], "approved")
+
+                apply_payload = {"change_types": ["tag_enrichment"]}
+                conn.request(
+                    "POST",
+                    f"/runs/{run_id}/apply",
+                    body=json.dumps(apply_payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                apply_resp = conn.getresponse()
+                applied = json.loads(apply_resp.read().decode("utf-8"))
+                conn.close()
+
+                self.assertEqual(apply_resp.status, 200)
+                self.assertEqual(applied["run_id"], run_id)
+                self.assertEqual(applied["state"], "applied")
+                self.assertIn("snapshot_id", applied)
+
+                rollback_payload = {"snapshot_id": applied["snapshot_id"]}
+                conn = HTTPConnection(self.host, self.port, timeout=2)
+                conn.request(
+                    "POST",
+                    f"/runs/{run_id}/rollback",
+                    body=json.dumps(rollback_payload),
+                    headers={"Content-Type": "application/json"},
+                )
+                rollback_resp = conn.getresponse()
+                rollback_body = json.loads(rollback_resp.read().decode("utf-8"))
+                conn.close()
+
+                self.assertEqual(rollback_resp.status, 200)
+                self.assertEqual(rollback_body["run_id"], run_id)
+                self.assertEqual(rollback_body["state"], "rolled_back")
 
     def test_persists_runs_across_server_restarts_when_state_file_set(self):
         with tempfile.TemporaryDirectory() as temp_dir:
