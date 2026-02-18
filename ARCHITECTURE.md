@@ -25,6 +25,8 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Coverage added in `tests/onboarding/test_analyze_readonly.py`
 - Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
 - Coverage added in `tests/contracts/test_run_lifecycle_policy.py`
+- Sensitivity gate cloud-eligibility contract implemented in `src/mind_lite/contracts/sensitivity_gate.py`
+- Coverage added in `tests/contracts/test_sensitivity_gate_policy.py`
 
 ---
 

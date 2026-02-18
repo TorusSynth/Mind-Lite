@@ -22,6 +22,8 @@ Implementation has not started. This is the contract to build against.
 - Contract tests implemented in `tests/onboarding/test_analyze_readonly.py`
 - Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
 - Contract tests implemented in `tests/contracts/test_run_lifecycle_policy.py`
+- Sensitivity gate cloud-eligibility contract implemented in `src/mind_lite/contracts/sensitivity_gate.py`
+- Contract tests implemented in `tests/contracts/test_sensitivity_gate_policy.py`
 
 ---
 
