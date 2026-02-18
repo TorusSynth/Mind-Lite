@@ -39,6 +39,10 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, service.list_gom_queue())
                 return
 
+            if path == "/publish/published":
+                self._write_json(200, service.list_published())
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]

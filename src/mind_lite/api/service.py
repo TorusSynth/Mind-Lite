@@ -514,6 +514,13 @@ class ApiService:
         self._persist_state()
         return dict(published)
 
+    def list_published(self) -> dict:
+        items = [dict(item) for item in self._gom_published]
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
