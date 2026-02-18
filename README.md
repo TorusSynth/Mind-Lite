@@ -12,6 +12,29 @@ Mind Lite is a local-first, Obsidian-native second brain engine that safely orga
 
 ---
 
+## Purpose
+
+This document is the primary entry point. It explains what Mind Lite is, why it exists, and where to read next for implementation context.
+
+---
+
+## Scope
+
+### In Scope
+
+- Product intent and value
+- Locked v1 decisions
+- Safety, routing, and publishing model
+- Navigation map to deeper docs
+
+### Out of Scope
+
+- Detailed endpoint contracts (see `API.md`)
+- Internal component boundaries (see `ARCHITECTURE.md`)
+- Day-by-day implementation sequencing (see `docs/plans/`)
+
+---
+
 ## Why Mind Lite Exists
 
 Mind Lite is designed to solve two problems at once:
@@ -108,3 +131,11 @@ Mind Lite publishes intentionally, never by default.
 This repository is in **documentation approval mode**.
 
 Coding starts only after documentation is reviewed and confirmed to match real user needs.
+
+---
+
+## Read Next
+
+1. `ROADMAP.md` for capability progression and phase exits
+2. `ARCHITECTURE.md` for system boundaries and run lifecycle
+3. `API.md` for behavior contracts and endpoint expectations

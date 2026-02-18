@@ -14,6 +14,28 @@ This roadmap ships by **verified outcomes**, not by dates.
 
 ---
 
+## Purpose
+
+This roadmap defines capability gates for Mind Lite v1. It is the planning contract for what must be true before moving between phases.
+
+---
+
+## Scope
+
+### In Scope
+
+- Capability phases from safety foundations through portfolio hardening
+- Exit criteria for each phase
+- Locked v1 decisions and out-of-scope boundaries
+
+### Out of Scope
+
+- Detailed component implementation design (see `ARCHITECTURE.md`)
+- Endpoint-level behavior definitions (see `API.md`)
+- Task-by-task execution sequencing (see `docs/plans/`)
+
+---
+
 ## Product Goal
 
 Build an Obsidian-native, local-first second brain that:
@@ -178,3 +200,11 @@ Mind Lite v1 is complete when all are true:
 - Multi-cloud provider orchestration beyond OpenAI fallback
 
 These remain future-phase upgrades.
+
+---
+
+## Read Next
+
+1. `ARCHITECTURE.md` for system-level component boundaries
+2. `API.md` for behavior contracts that satisfy roadmap gates
+3. `docs/specs/prebuild-go-no-go-checklist.md` for coding start decision
