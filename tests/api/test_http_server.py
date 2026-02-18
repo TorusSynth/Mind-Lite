@@ -386,6 +386,43 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(body["provider_trace"]["provider"], "openai")
         self.assertTrue(body["provider_trace"]["fallback_used"])
 
+    def test_ask_endpoint_replays_duplicate_event_id(self):
+        first_payload = {
+            "query": "What should I work on?",
+            "local_confidence": 0.55,
+            "event_id": "evt_001",
+        }
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/ask",
+            body=json.dumps(first_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        first_resp = conn.getresponse()
+        first_body = json.loads(first_resp.read().decode("utf-8"))
+        self.assertEqual(first_resp.status, 200)
+        self.assertFalse(first_body["idempotency"]["duplicate"])
+
+        second_payload = {
+            "query": "Different prompt should be ignored on duplicate",
+            "local_confidence": 0.1,
+            "event_id": "evt_001",
+        }
+        conn.request(
+            "POST",
+            "/ask",
+            body=json.dumps(second_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        second_resp = conn.getresponse()
+        second_body = json.loads(second_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(second_resp.status, 200)
+        self.assertTrue(second_body["idempotency"]["duplicate"])
+        self.assertEqual(second_body["answer"]["text"], first_body["answer"]["text"])
+
     def test_ask_endpoint_requires_query(self):
         conn = HTTPConnection(self.host, self.port, timeout=2)
         conn.request(

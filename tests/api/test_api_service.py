@@ -188,6 +188,28 @@ class ApiServiceTests(unittest.TestCase):
         self.assertTrue(result["provider_trace"]["fallback_used"])
         self.assertEqual(result["provider_trace"]["fallback_reason"], "low_confidence")
 
+    def test_ask_replays_same_response_for_duplicate_event_id(self):
+        service = ApiService()
+
+        first = service.ask(
+            {
+                "query": "What should I work on?",
+                "local_confidence": 0.55,
+                "event_id": "evt_001",
+            }
+        )
+        second = service.ask(
+            {
+                "query": "Different prompt should be ignored on duplicate",
+                "local_confidence": 0.10,
+                "event_id": "evt_001",
+            }
+        )
+
+        self.assertFalse(first["idempotency"]["duplicate"])
+        self.assertTrue(second["idempotency"]["duplicate"])
+        self.assertEqual(second["answer"]["text"], first["answer"]["text"])
+
     def test_ask_blocks_cloud_fallback_when_sensitivity_fails(self):
         service = ApiService()
 
