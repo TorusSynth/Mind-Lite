@@ -36,6 +36,8 @@ class ApiService:
         self._links_apply_response_by_event: dict[str, dict] = {}
         self._publish_mark_replay_ledger = RunReplayLedger()
         self._publish_mark_response_by_event: dict[str, dict] = {}
+        self._publish_export_replay_ledger = RunReplayLedger()
+        self._publish_export_response_by_event: dict[str, dict] = {}
         self._publish_confirm_replay_ledger = RunReplayLedger()
         self._publish_confirm_response_by_event: dict[str, dict] = {}
         self._load_state_if_present()
@@ -544,6 +546,25 @@ class ApiService:
         }
 
     def export_for_gom(self, payload: dict) -> dict:
+        event_id = payload.get("event_id")
+        if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
+            raise ValueError("event_id must be a non-empty string")
+        normalized_event_id = event_id.strip() if isinstance(event_id, str) else None
+
+        if normalized_event_id is not None:
+            cached = self._publish_export_response_by_event.get(normalized_event_id)
+            if cached is not None:
+                replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
+                if not replay.duplicate:
+                    replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
+                duplicated = dict(cached)
+                duplicated["idempotency"] = {
+                    "event_id": normalized_event_id,
+                    "duplicate": True,
+                    "reason": replay.reason,
+                }
+                return duplicated
+
         draft_id = payload.get("draft_id")
         if not isinstance(draft_id, str) or not draft_id.strip():
             raise ValueError("draft_id is required")
@@ -577,12 +598,24 @@ class ApiService:
                 sort_keys=True,
             )
 
-        return {
+        response = {
             "draft_id": matched["draft_id"],
             "format": export_format,
             "status": "export_ready",
             "artifact": artifact,
         }
+        response["idempotency"] = {
+            "event_id": normalized_event_id,
+            "duplicate": False,
+            "reason": "accepted" if normalized_event_id is not None else "not_provided",
+        }
+        if normalized_event_id is not None:
+            replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
+            if replay.duplicate:
+                raise ValueError("missing replay cache for duplicate event")
+            self._publish_export_response_by_event[normalized_event_id] = dict(response)
+            self._persist_state()
+        return response
 
     def confirm_gom(self, payload: dict) -> dict:
         event_id = payload.get("event_id")
@@ -873,6 +906,15 @@ class ApiService:
         self._publish_mark_replay_ledger = RunReplayLedger()
         for event_id in sorted(self._publish_mark_response_by_event.keys()):
             apply_event(self._publish_mark_replay_ledger, "publish_mark", event_id)
+        publish_export_replay_payload = payload.get("publish_export_replay", {})
+        self._publish_export_response_by_event = {
+            key: dict(value)
+            for key, value in publish_export_replay_payload.items()
+            if isinstance(key, str) and isinstance(value, dict)
+        }
+        self._publish_export_replay_ledger = RunReplayLedger()
+        for event_id in sorted(self._publish_export_response_by_event.keys()):
+            apply_event(self._publish_export_replay_ledger, "publish_export", event_id)
         publish_confirm_replay_payload = payload.get("publish_confirm_replay", {})
         self._publish_confirm_response_by_event = {
             key: dict(value)
@@ -900,6 +942,7 @@ class ApiService:
             "ask_replay": self._ask_response_by_event,
             "links_apply_replay": self._links_apply_response_by_event,
             "publish_mark_replay": self._publish_mark_response_by_event,
+            "publish_export_replay": self._publish_export_response_by_event,
             "publish_confirm_replay": self._publish_confirm_response_by_event,
             "snapshots": self._snapshot_store.export_records(),
         }
