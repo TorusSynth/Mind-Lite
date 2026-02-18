@@ -23,6 +23,8 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
 - Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
 - Coverage added in `tests/onboarding/test_analyze_readonly.py`
+- Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
+- Coverage added in `tests/contracts/test_run_lifecycle_policy.py`
 
 ---
 

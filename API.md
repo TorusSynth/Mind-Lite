@@ -20,6 +20,8 @@ Implementation has not started. This is the contract to build against.
 - Contract tests implemented in `tests/contracts/test_action_tiering_policy.py`
 - Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
 - Contract tests implemented in `tests/onboarding/test_analyze_readonly.py`
+- Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
+- Contract tests implemented in `tests/contracts/test_run_lifecycle_policy.py`
 
 ---
 
