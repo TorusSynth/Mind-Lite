@@ -15,6 +15,14 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, service.health())
                 return
 
+            if path == "/health/ready":
+                self._write_json(200, service.health_ready())
+                return
+
+            if path == "/metrics":
+                self._write_text(200, service.metrics(), "text/plain; version=0.0.4")
+                return
+
             if path == "/runs":
                 self._write_json(200, service.list_runs())
                 return
@@ -70,6 +78,15 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
             if path == "/policy/sensitivity/check":
                 try:
                     result = service.check_sensitivity(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, result)
+                return
+
+            if path == "/ask":
+                try:
+                    result = service.ask(body)
                 except ValueError as exc:
                     self._write_json(400, {"error": str(exc)})
                     return
@@ -144,6 +161,14 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
             encoded = json.dumps(payload).encode("utf-8")
             self.send_response(status_code)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def _write_text(self, status_code: int, payload: str, content_type: str) -> None:
+            encoded = payload.encode("utf-8")
+            self.send_response(status_code)
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
             self.wfile.write(encoded)

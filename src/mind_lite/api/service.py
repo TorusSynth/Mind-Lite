@@ -32,6 +32,27 @@ class ApiService:
     def health(self) -> dict:
         return {"status": "ok"}
 
+    def health_ready(self) -> dict:
+        return {"status": "ready"}
+
+    def metrics(self) -> str:
+        run_count = len(self._runs)
+        proposal_count = sum(len(items) for items in self._proposals_by_run.values())
+        snapshot_count = len(self._snapshot_store.export_records())
+        lines = [
+            "# HELP mind_lite_runs_total Total runs recorded",
+            "# TYPE mind_lite_runs_total gauge",
+            f"mind_lite_runs_total {run_count}",
+            "# HELP mind_lite_proposals_total Total proposals recorded",
+            "# TYPE mind_lite_proposals_total gauge",
+            f"mind_lite_proposals_total {proposal_count}",
+            "# HELP mind_lite_snapshots_total Total snapshots recorded",
+            "# TYPE mind_lite_snapshots_total gauge",
+            f"mind_lite_snapshots_total {snapshot_count}",
+            "",
+        ]
+        return "\n".join(lines)
+
     def analyze_folder(self, payload: dict) -> dict:
         folder_path = payload.get("folder_path")
         if not isinstance(folder_path, str) or not folder_path:
@@ -249,6 +270,86 @@ class ApiService:
             "budget": {
                 "monthly_spend": self._monthly_spend,
                 "monthly_cap": self._monthly_budget_cap,
+                "status": budget_decision.status,
+                "cloud_allowed": budget_decision.cloud_allowed,
+                "local_only_mode": budget_decision.local_only_mode,
+            },
+        }
+
+    def ask(self, payload: dict) -> dict:
+        query = payload.get("query")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+
+        allow_fallback = payload.get("allow_fallback", True)
+        if not isinstance(allow_fallback, bool):
+            raise ValueError("allow_fallback must be a boolean")
+
+        local_confidence = payload.get("local_confidence", 0.85)
+        if not isinstance(local_confidence, (float, int)):
+            raise ValueError("local_confidence must be a number")
+        local_confidence = float(local_confidence)
+
+        local_timed_out = payload.get("local_timed_out", False)
+        if not isinstance(local_timed_out, bool):
+            raise ValueError("local_timed_out must be a boolean")
+
+        grounding_failed = payload.get("grounding_failed", False)
+        if not isinstance(grounding_failed, bool):
+            raise ValueError("grounding_failed must be a boolean")
+
+        frontmatter = payload.get("frontmatter", {})
+        tags = payload.get("tags", [])
+        path = payload.get("path", "")
+        content = payload.get("content", "")
+
+        if not isinstance(frontmatter, dict):
+            raise ValueError("frontmatter must be an object")
+        if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+            raise ValueError("tags must be a list of strings")
+        if not isinstance(path, str):
+            raise ValueError("path must be a string")
+        if not isinstance(content, str):
+            raise ValueError("content must be a string")
+
+        sensitivity = cloud_eligibility(
+            SensitivityInput(
+                frontmatter=frontmatter,
+                tags=tags,
+                path=path,
+                content=content,
+            )
+        )
+
+        budget_decision = evaluate_budget(self._monthly_spend, self._monthly_budget_cap)
+        cloud_allowed = allow_fallback and sensitivity.allowed and budget_decision.cloud_allowed
+
+        routing = select_provider(
+            RoutingInput(
+                local_confidence=local_confidence,
+                local_timed_out=local_timed_out,
+                grounding_failed=grounding_failed,
+                cloud_allowed=cloud_allowed,
+            )
+        )
+
+        return {
+            "answer": {
+                "text": f"Draft answer for: {query.strip()}",
+                "confidence": local_confidence,
+            },
+            "provider_trace": {
+                "initial": "local",
+                "provider": routing.provider,
+                "fallback_used": routing.fallback_used,
+                "fallback_provider": routing.provider if routing.fallback_used else None,
+                "fallback_reason": routing.reason,
+            },
+            "sensitivity": {
+                "allowed": sensitivity.allowed,
+                "reasons": list(sensitivity.reasons),
+            },
+            "budget": {
                 "status": budget_decision.status,
                 "cloud_allowed": budget_decision.cloud_allowed,
                 "local_only_mode": budget_decision.local_only_mode,
