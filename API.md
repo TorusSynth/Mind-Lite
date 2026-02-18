@@ -40,6 +40,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
+- HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
 ---
 
@@ -56,6 +57,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 Run locally with:
 
 `PYTHONPATH=src python3 -m mind_lite.api`
+
+Persist state across restarts with:
+
+`MIND_LITE_STATE_FILE=.mind_lite/state.json PYTHONPATH=src python3 -m mind_lite.api`
 
 ---
 

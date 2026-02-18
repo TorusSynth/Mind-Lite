@@ -42,6 +42,7 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
+- HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
 ---
 
