@@ -35,6 +35,8 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Coverage added in `tests/contracts/test_provider_routing_policy.py`
 - Idempotency replay contract implemented in `src/mind_lite/contracts/idempotency_replay.py`
 - Coverage added in `tests/contracts/test_idempotency_replay_policy.py`
+- Rollback validation invariants contract implemented in `src/mind_lite/contracts/rollback_validation.py`
+- Coverage added in `tests/contracts/test_rollback_validation_policy.py`
 
 ---
 
