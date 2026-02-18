@@ -19,6 +19,14 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, service.list_runs())
                 return
 
+            if path == "/policy/sensitivity":
+                self._write_json(200, service.get_sensitivity_policy())
+                return
+
+            if path == "/policy/routing":
+                self._write_json(200, service.get_routing_policy())
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]
@@ -59,11 +67,32 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, result)
                 return
 
+            if path == "/policy/sensitivity/check":
+                try:
+                    result = service.check_sensitivity(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, result)
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "apply":
                 run_id = run_route[0]
                 try:
                     result = service.apply_run(run_id, body)
+                except ValueError as exc:
+                    error_message = str(exc)
+                    status = 404 if "unknown run id" in error_message else 400
+                    self._write_json(status, {"error": error_message})
+                    return
+                self._write_json(200, result)
+                return
+
+            if run_route is not None and run_route[1] == "approve":
+                run_id = run_route[0]
+                try:
+                    result = service.approve_run(run_id, body)
                 except ValueError as exc:
                     error_message = str(exc)
                     status = 404 if "unknown run id" in error_message else 400

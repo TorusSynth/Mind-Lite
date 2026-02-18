@@ -3,6 +3,15 @@ import json
 from pathlib import Path
 
 from mind_lite.contracts.action_tiering import decide_action_mode
+from mind_lite.contracts.budget_guardrails import evaluate_budget
+from mind_lite.contracts.provider_routing import select_provider, RoutingInput
+from mind_lite.contracts.sensitivity_gate import (
+    PROTECTED_PATH_PREFIXES,
+    PROTECTED_TAGS,
+    SECRET_PATTERNS,
+    SensitivityInput,
+    cloud_eligibility,
+)
 from mind_lite.contracts.rollback_validation import validate_rollback_request
 from mind_lite.contracts.snapshot_rollback import SnapshotStore, apply_batch
 from mind_lite.onboarding.analyze_readonly import analyze_folder
@@ -15,6 +24,9 @@ class ApiService:
         self._snapshot_store = SnapshotStore()
         self._run_counter = 0
         self._state_file = Path(state_file) if state_file is not None else None
+        self._monthly_budget_cap = 30.0
+        self._monthly_spend = 0.0
+        self._local_confidence_threshold = 0.70
         self._load_state_if_present()
 
     def health(self) -> dict:
@@ -52,6 +64,42 @@ class ApiService:
         proposals = [dict(item) for item in self._proposals_by_run.get(run_id, [])]
         return {"run_id": run_id, "proposals": proposals}
 
+    def approve_run(self, run_id: str, payload: dict) -> dict:
+        if run_id not in self._runs:
+            raise ValueError(f"unknown run id: {run_id}")
+
+        requested_types = payload.get("change_types")
+        if requested_types is not None:
+            if not isinstance(requested_types, list) or not all(isinstance(x, str) for x in requested_types):
+                raise ValueError("change_types must be a list of strings")
+            type_filter = set(requested_types)
+        else:
+            type_filter = None
+
+        selected: list[dict] = []
+        for proposal in self._proposals_by_run.get(run_id, []):
+            if proposal["status"] not in {"pending", "approved"}:
+                continue
+            if type_filter is not None and proposal["change_type"] not in type_filter:
+                continue
+            selected.append(proposal)
+
+        if not selected:
+            raise ValueError("no matching proposals to approve")
+
+        for proposal in selected:
+            proposal["status"] = "approved"
+
+        run = self._runs[run_id]
+        run["state"] = "approved"
+        self._persist_state()
+
+        return {
+            "run_id": run_id,
+            "state": run["state"],
+            "approved_count": len(selected),
+        }
+
     def apply_run(self, run_id: str, payload: dict) -> dict:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
@@ -66,7 +114,7 @@ class ApiService:
 
         selected: list[dict] = []
         for proposal in self._proposals_by_run.get(run_id, []):
-            if proposal["status"] != "pending":
+            if proposal["status"] not in {"pending", "approved"}:
                 continue
             if type_filter is not None and proposal["change_type"] not in type_filter:
                 continue
@@ -117,6 +165,94 @@ class ApiService:
             "run_id": run_id,
             "state": run["state"],
             "rolled_back_snapshot_id": requested_snapshot,
+        }
+
+    def check_sensitivity(self, payload: dict) -> dict:
+        frontmatter = payload.get("frontmatter", {})
+        tags = payload.get("tags", [])
+        path = payload.get("path", "")
+        content = payload.get("content", "")
+
+        if not isinstance(frontmatter, dict):
+            raise ValueError("frontmatter must be an object")
+        if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+            raise ValueError("tags must be a list of strings")
+        if not isinstance(path, str):
+            raise ValueError("path must be a string")
+        if not isinstance(content, str):
+            raise ValueError("content must be a string")
+
+        result = cloud_eligibility(
+            SensitivityInput(
+                frontmatter=frontmatter,
+                tags=tags,
+                path=path,
+                content=content,
+            )
+        )
+        return {
+            "allowed": result.allowed,
+            "reasons": list(result.reasons),
+        }
+
+    def get_sensitivity_policy(self) -> dict:
+        return {
+            "protected_tags": sorted(PROTECTED_TAGS),
+            "protected_path_prefixes": list(PROTECTED_PATH_PREFIXES),
+            "secret_pattern_count": len(SECRET_PATTERNS),
+        }
+
+    def get_routing_policy(self) -> dict:
+        budget_decision = evaluate_budget(self._monthly_spend, self._monthly_budget_cap)
+        cloud_allowed = budget_decision.cloud_allowed
+        fallback_reasons = [
+            "timeout",
+            "grounding_failure",
+            "low_confidence",
+        ]
+
+        preview = {
+            "timeout": select_provider(
+                RoutingInput(
+                    local_confidence=0.90,
+                    local_timed_out=True,
+                    grounding_failed=False,
+                    cloud_allowed=cloud_allowed,
+                )
+            ).provider,
+            "grounding_failure": select_provider(
+                RoutingInput(
+                    local_confidence=0.90,
+                    local_timed_out=False,
+                    grounding_failed=True,
+                    cloud_allowed=cloud_allowed,
+                )
+            ).provider,
+            "low_confidence": select_provider(
+                RoutingInput(
+                    local_confidence=0.60,
+                    local_timed_out=False,
+                    grounding_failed=False,
+                    cloud_allowed=cloud_allowed,
+                )
+            ).provider,
+        }
+
+        return {
+            "routing": {
+                "local_provider": "local",
+                "fallback_provider": "openai",
+                "local_confidence_threshold": self._local_confidence_threshold,
+                "fallback_reasons": fallback_reasons,
+                "fallback_preview": preview,
+            },
+            "budget": {
+                "monthly_spend": self._monthly_spend,
+                "monthly_cap": self._monthly_budget_cap,
+                "status": budget_decision.status,
+                "cloud_allowed": budget_decision.cloud_allowed,
+                "local_only_mode": budget_decision.local_only_mode,
+            },
         }
 
     def _next_run_id(self) -> str:
