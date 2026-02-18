@@ -429,6 +429,53 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_export_for_gom_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        mark_payload = {
+            "draft_id": "draft_020",
+            "title": "Atlas Release",
+            "prepared_content": "Ready to publish.",
+        }
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(mark_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp = conn.getresponse()
+        self.assertEqual(mark_resp.status, 200)
+        mark_resp.read()
+
+        export_payload = {"draft_id": "draft_020", "format": "markdown"}
+        conn.request(
+            "POST",
+            "/publish/export-for-gom",
+            body=json.dumps(export_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        export_resp = conn.getresponse()
+        export_body = json.loads(export_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(export_resp.status, 200)
+        self.assertEqual(export_body["draft_id"], "draft_020")
+        self.assertEqual(export_body["status"], "export_ready")
+
+    def test_export_for_gom_endpoint_rejects_unknown_draft(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/export-for-gom",
+            body=json.dumps({"draft_id": "missing", "format": "markdown"}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()

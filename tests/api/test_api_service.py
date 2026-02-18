@@ -248,6 +248,29 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.mark_for_gom({"draft_id": "draft_011", "title": "Missing content"})
 
+    def test_export_for_gom_returns_export_payload_for_queued_draft(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_020",
+                "title": "Atlas Release",
+                "prepared_content": "Ready to publish.",
+            }
+        )
+
+        exported = service.export_for_gom({"draft_id": "draft_020", "format": "markdown"})
+
+        self.assertEqual(exported["draft_id"], "draft_020")
+        self.assertEqual(exported["format"], "markdown")
+        self.assertEqual(exported["status"], "export_ready")
+        self.assertIn("artifact", exported)
+
+    def test_export_for_gom_rejects_unknown_draft(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.export_for_gom({"draft_id": "missing", "format": "markdown"})
+
 
 if __name__ == "__main__":
     unittest.main()
