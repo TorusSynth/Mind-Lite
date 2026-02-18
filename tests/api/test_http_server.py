@@ -345,6 +345,47 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_publish_prepare_endpoint(self):
+        payload = {
+            "draft_id": "draft_003",
+            "content": "# Title\n\nThis is a publishable note with links and structure.",
+            "target": "gom",
+        }
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/prepare",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["draft_id"], "draft_003")
+        self.assertEqual(body["target"], "gom")
+        self.assertTrue(body["sanitized"])
+
+    def test_publish_prepare_endpoint_requires_target(self):
+        payload = {
+            "draft_id": "draft_003",
+            "content": "# Title\n\nThis is a publishable note with links and structure.",
+        }
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/prepare",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()

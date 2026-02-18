@@ -203,6 +203,28 @@ class ApiServiceTests(unittest.TestCase):
         self.assertFalse(result["gate_passed"])
         self.assertLess(result["scores"]["overall"], 0.8)
 
+    def test_publish_prepare_returns_sanitized_draft_payload(self):
+        service = ApiService()
+
+        result = service.publish_prepare(
+            {
+                "draft_id": "draft_003",
+                "content": "# Title\n\nThis is a publishable note with links and structure.",
+                "target": "gom",
+            }
+        )
+
+        self.assertEqual(result["draft_id"], "draft_003")
+        self.assertEqual(result["target"], "gom")
+        self.assertIn("prepared_content", result)
+        self.assertTrue(result["sanitized"])
+
+    def test_publish_prepare_requires_draft_id_content_and_target(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.publish_prepare({"draft_id": "draft_004", "content": "text"})
+
 
 if __name__ == "__main__":
     unittest.main()
