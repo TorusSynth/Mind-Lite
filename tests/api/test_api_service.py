@@ -20,6 +20,34 @@ class ApiServiceTests(unittest.TestCase):
         self.assertIn("mind_lite_runs_total", metrics)
         self.assertIn("mind_lite_proposals_total", metrics)
 
+    def test_metrics_include_publish_queue_and_published_counts(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_001",
+                "title": "Atlas Weekly",
+                "prepared_content": "Queued payload",
+            }
+        )
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_002",
+                "title": "Atlas Launch",
+                "prepared_content": "Published payload",
+            }
+        )
+        service.confirm_gom(
+            {
+                "draft_id": "draft_002",
+                "published_url": "https://gom.example/posts/atlas-launch",
+            }
+        )
+
+        metrics = service.metrics()
+
+        self.assertIn("mind_lite_publish_queue_total 1", metrics)
+        self.assertIn("mind_lite_publish_published_total 1", metrics)
+
     def test_analyze_folder_creates_run_record(self):
         service = ApiService()
         with tempfile.TemporaryDirectory() as temp_dir:

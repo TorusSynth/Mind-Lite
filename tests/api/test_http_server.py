@@ -53,6 +53,64 @@ class HttpServerTests(unittest.TestCase):
         self.assertIn("mind_lite_runs_total", body)
         self.assertIn("mind_lite_proposals_total", body)
 
+    def test_metrics_endpoint_includes_publish_counts(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(
+                {
+                    "draft_id": "draft_001",
+                    "title": "Atlas Weekly",
+                    "prepared_content": "Queued payload",
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp_1 = conn.getresponse()
+        self.assertEqual(mark_resp_1.status, 200)
+        mark_resp_1.read()
+
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(
+                {
+                    "draft_id": "draft_002",
+                    "title": "Atlas Launch",
+                    "prepared_content": "Published payload",
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp_2 = conn.getresponse()
+        self.assertEqual(mark_resp_2.status, 200)
+        mark_resp_2.read()
+
+        conn.request(
+            "POST",
+            "/publish/confirm-gom",
+            body=json.dumps(
+                {
+                    "draft_id": "draft_002",
+                    "published_url": "https://gom.example/posts/atlas-launch",
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        confirm_resp = conn.getresponse()
+        self.assertEqual(confirm_resp.status, 200)
+        confirm_resp.read()
+
+        conn.request("GET", "/metrics")
+        metrics_resp = conn.getresponse()
+        metrics_body = metrics_resp.read().decode("utf-8")
+        conn.close()
+
+        self.assertEqual(metrics_resp.status, 200)
+        self.assertIn("mind_lite_publish_queue_total 1", metrics_body)
+        self.assertIn("mind_lite_publish_published_total 1", metrics_body)
+
     def test_runs_history_endpoint(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
