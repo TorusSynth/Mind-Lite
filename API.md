@@ -26,6 +26,8 @@ Implementation has not started. This is the contract to build against.
 - Contract tests implemented in `tests/contracts/test_sensitivity_gate_policy.py`
 - Budget guardrails contract implemented in `src/mind_lite/contracts/budget_guardrails.py`
 - Contract tests implemented in `tests/contracts/test_budget_guardrails_policy.py`
+- Snapshot rollback contract implemented in `src/mind_lite/contracts/snapshot_rollback.py`
+- Contract tests implemented in `tests/contracts/test_snapshot_rollback_policy.py`
 
 ---
 
