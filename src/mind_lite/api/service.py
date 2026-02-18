@@ -36,6 +36,8 @@ class ApiService:
         self._links_apply_response_by_event: dict[str, dict] = {}
         self._publish_mark_replay_ledger = RunReplayLedger()
         self._publish_mark_response_by_event: dict[str, dict] = {}
+        self._publish_confirm_replay_ledger = RunReplayLedger()
+        self._publish_confirm_response_by_event: dict[str, dict] = {}
         self._load_state_if_present()
 
     def health(self) -> dict:
@@ -571,6 +573,25 @@ class ApiService:
         }
 
     def confirm_gom(self, payload: dict) -> dict:
+        event_id = payload.get("event_id")
+        if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
+            raise ValueError("event_id must be a non-empty string")
+        normalized_event_id = event_id.strip() if isinstance(event_id, str) else None
+
+        if normalized_event_id is not None:
+            replay = apply_event(self._publish_confirm_replay_ledger, "publish_confirm", normalized_event_id)
+            if replay.duplicate:
+                cached = self._publish_confirm_response_by_event.get(normalized_event_id)
+                if cached is None:
+                    raise ValueError("missing replay cache for duplicate event")
+                duplicated = dict(cached)
+                duplicated["idempotency"] = {
+                    "event_id": normalized_event_id,
+                    "duplicate": True,
+                    "reason": replay.reason,
+                }
+                return duplicated
+
         draft_id = payload.get("draft_id")
         if not isinstance(draft_id, str) or not draft_id.strip():
             raise ValueError("draft_id is required")
@@ -595,7 +616,14 @@ class ApiService:
             "published_url": published_url.strip(),
             "status": "published",
         }
+        published["idempotency"] = {
+            "event_id": normalized_event_id,
+            "duplicate": False,
+            "reason": "accepted" if normalized_event_id is not None else "not_provided",
+        }
         self._gom_published.append(published)
+        if normalized_event_id is not None:
+            self._publish_confirm_response_by_event[normalized_event_id] = dict(published)
         self._persist_state()
         return dict(published)
 
@@ -833,6 +861,15 @@ class ApiService:
         self._publish_mark_replay_ledger = RunReplayLedger()
         for event_id in sorted(self._publish_mark_response_by_event.keys()):
             apply_event(self._publish_mark_replay_ledger, "publish_mark", event_id)
+        publish_confirm_replay_payload = payload.get("publish_confirm_replay", {})
+        self._publish_confirm_response_by_event = {
+            key: dict(value)
+            for key, value in publish_confirm_replay_payload.items()
+            if isinstance(key, str) and isinstance(value, dict)
+        }
+        self._publish_confirm_replay_ledger = RunReplayLedger()
+        for event_id in sorted(self._publish_confirm_response_by_event.keys()):
+            apply_event(self._publish_confirm_replay_ledger, "publish_confirm", event_id)
         snapshot_payload = payload.get("snapshots", {})
         if isinstance(snapshot_payload, dict):
             self._snapshot_store.import_records(snapshot_payload)
@@ -851,6 +888,7 @@ class ApiService:
             "ask_replay": self._ask_response_by_event,
             "links_apply_replay": self._links_apply_response_by_event,
             "publish_mark_replay": self._publish_mark_response_by_event,
+            "publish_confirm_replay": self._publish_confirm_response_by_event,
             "snapshots": self._snapshot_store.export_records(),
         }
         self._state_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
