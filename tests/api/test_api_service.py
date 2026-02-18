@@ -387,6 +387,30 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.organize_classify({"notes": [{"note_id": "n1"}]})
 
+    def test_links_propose_returns_scored_suggestions(self):
+        service = ApiService()
+
+        result = service.links_propose(
+            {
+                "source_note_id": "n1",
+                "candidate_notes": [
+                    {"note_id": "n2", "title": "Atlas Architecture"},
+                    {"note_id": "n3", "title": "Random Grocery List"},
+                ],
+            }
+        )
+
+        self.assertEqual(result["source_note_id"], "n1")
+        self.assertEqual(len(result["suggestions"]), 2)
+        self.assertEqual(result["suggestions"][0]["target_note_id"], "n2")
+        self.assertGreater(result["suggestions"][0]["confidence"], result["suggestions"][1]["confidence"])
+
+    def test_links_propose_requires_source_and_candidates(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.links_propose({"source_note_id": "n1", "candidate_notes": []})
+
 
 if __name__ == "__main__":
     unittest.main()

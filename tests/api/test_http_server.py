@@ -706,6 +706,44 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_links_propose_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        payload = {
+            "source_note_id": "n1",
+            "candidate_notes": [
+                {"note_id": "n2", "title": "Atlas Architecture"},
+                {"note_id": "n3", "title": "Random Grocery List"},
+            ],
+        }
+        conn.request(
+            "POST",
+            "/links/propose",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["source_note_id"], "n1")
+        self.assertEqual(len(body["suggestions"]), 2)
+
+    def test_links_propose_endpoint_rejects_empty_candidates(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/links/propose",
+            body=json.dumps({"source_note_id": "n1", "candidate_notes": []}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()
