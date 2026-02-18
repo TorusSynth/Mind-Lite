@@ -11,6 +11,22 @@ Ensure every meaningful transformation in Mind Lite is traceable, reviewable, an
 
 ---
 
+## Scope
+
+### In Scope
+
+- Mandatory lineage fields for non-trivial operations
+- Canonical event types and replay expectations
+- Publish lineage requirements and retention rules
+
+### Out of Scope
+
+- Storage engine implementation details
+- Encryption-at-rest policy specifics
+- Multi-tenant provenance requirements
+
+---
+
 ## Mandatory Lineage Fields
 
 Every non-trivial operation must include:
@@ -111,3 +127,10 @@ For every published artifact, record:
 - Every `published` event references source note lineage
 - Replaying event chain for one run reproduces decision timeline
 - No event write path omits mandatory fields
+
+---
+
+## Read Next
+
+- `docs/specs/threat-model-v1.md` for risk controls tied to lineage events
+- `ARCHITECTURE.md` for run lifecycle and safety engine context

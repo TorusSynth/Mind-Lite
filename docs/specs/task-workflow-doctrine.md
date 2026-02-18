@@ -11,6 +11,22 @@ Define how Mind Lite reduces daily cognitive load by turning notes into clear ne
 
 ---
 
+## Scope
+
+### In Scope
+
+- Daily and weekly operating workflows
+- Failure and escalation behavior
+- Output contracts and productivity KPIs
+
+### Out of Scope
+
+- UI component-level interaction design
+- Model routing internals
+- Publishing rubric implementation details
+
+---
+
 ## Daily Workflow (Light)
 
 1. Run `Mind Lite: Daily Triage`
@@ -91,3 +107,10 @@ Mind Lite workflow must be re-tuned if either condition is true for 2 consecutiv
 
 - Daily triage exceeds 15 minutes on average
 - Suggested tasks are judged "not useful" in > 30% of cases
+
+---
+
+## Read Next
+
+- `docs/specs/calm-ux-rules.md` for interaction and trust constraints
+- `docs/evals/v1-scorecard.md` for KPI and evidence tracking

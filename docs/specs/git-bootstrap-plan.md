@@ -11,6 +11,22 @@ Define the minimum git setup sequence before coding starts, so documentation bas
 
 ---
 
+## Scope
+
+### In Scope
+
+- Minimum repository bootstrapping sequence before first code work
+- Baseline documentation commit expectations
+- Guardrails for separating planning and implementation commits
+
+### Out of Scope
+
+- Branching strategy after implementation is underway
+- CI/CD automation setup
+- Release and deployment workflow
+
+---
+
 ## Sequence
 
 1. Initialize repository in project root
@@ -40,3 +56,10 @@ Define the minimum git setup sequence before coding starts, so documentation bas
 - Do not start coding before docs baseline commit exists
 - Keep planning commits separate from implementation commits
 - Require passing prebuild checklist before first code commit
+
+---
+
+## Read Next
+
+- `docs/specs/prebuild-go-no-go-checklist.md` for coding start gate
+- `docs/specs/docs-approval-rubric.md` for narrative clarity sign-off

@@ -11,6 +11,28 @@ Coding may start only if all required checks are marked PASS.
 
 ---
 
+## Purpose
+
+Provide a binary implementation-start gate that confirms planning artifacts are coherent, safe, and operationally ready.
+
+---
+
+## Scope
+
+### In Scope
+
+- Cross-document readiness checks for v1 start
+- Safety, usability, and operational preconditions
+- Final GO or NO-GO decision recording
+
+### Out of Scope
+
+- Runtime verification after coding begins
+- Feature-level acceptance testing
+- Release readiness for production
+
+---
+
 ## A) Scope and Behavior Clarity
 
 - [x] PASS / [ ] FAIL - `FOUNDATION.md` and `README.md` align on what v1 is and is not
@@ -58,3 +80,10 @@ Coding may start only if all required checks are marked PASS.
 
 Decision owner: ____________________  
 Date: ____________________
+
+---
+
+## Read Next
+
+- `docs/specs/docs-approval-rubric.md` for narrative clarity scoring
+- `docs/plans/2026-02-18-docs-clarity-two-pass-implementation.md` for doc pass execution sequence

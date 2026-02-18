@@ -11,6 +11,28 @@ Mind Lite should reduce cognitive burden, not create more decisions than the val
 
 ---
 
+## Purpose
+
+Define the UX behavior rules that keep Mind Lite predictable, low-friction, and trustworthy during daily and weekly use.
+
+---
+
+## Scope
+
+### In Scope
+
+- Interaction budget targets for key workflows
+- Attention protection and trust visibility rules
+- UX failure criteria and required verification checks
+
+### Out of Scope
+
+- Visual design system implementation details
+- API or storage contracts
+- Long-term personalization features beyond v1
+
+---
+
 ## Friction Budget
 
 - Daily triage flow: <= 7 interactions
@@ -70,3 +92,10 @@ Rework interaction design if either occurs for 2 consecutive weeks:
 - Pilot users (you + one optional reviewer) can complete daily triage within friction budget
 - Rollback action is discoverable in <= 10 seconds from review view
 - Provider usage visibility is present on every routed answer
+
+---
+
+## Read Next
+
+- `docs/specs/task-workflow-doctrine.md` for daily and weekly workflow outcomes
+- `docs/specs/prebuild-go-no-go-checklist.md` for coding readiness gate

@@ -11,6 +11,12 @@ Single-user local deployment with Obsidian plugin, local runtime (LM Studio), an
 
 ---
 
+## Purpose
+
+Define the highest-priority v1 risks and the minimum control set required to keep privacy, safety, and trust boundaries intact.
+
+---
+
 ## Assets to Protect
 
 - Private vault markdown and metadata
@@ -97,3 +103,10 @@ Single-user local deployment with Obsidian plugin, local runtime (LM Studio), an
 - Remote public API exposure hardening
 - Enterprise key management systems
 - Zero-trust distributed deployment patterns
+
+---
+
+## Read Next
+
+- `docs/specs/provenance-lineage-contract.md` for auditability and replay guarantees
+- `ARCHITECTURE.md` for routing, safety, and failure-state implementation boundaries
