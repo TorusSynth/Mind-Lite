@@ -68,6 +68,18 @@ def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPSer
                 self._write_json(200, result)
                 return
 
+            if run_route is not None and run_route[1] == "rollback":
+                run_id = run_route[0]
+                try:
+                    result = service.rollback_run(run_id, body)
+                except ValueError as exc:
+                    error_message = str(exc)
+                    status = 404 if "unknown run id" in error_message else 400
+                    self._write_json(status, {"error": error_message})
+                    return
+                self._write_json(200, result)
+                return
+
             self._write_json(404, {"error": "not found"})
 
         def _parse_run_route(self, path: str) -> tuple[str, str | None] | None:

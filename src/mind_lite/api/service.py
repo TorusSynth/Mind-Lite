@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
 from mind_lite.contracts.action_tiering import decide_action_mode
+from mind_lite.contracts.rollback_validation import validate_rollback_request
 from mind_lite.contracts.snapshot_rollback import SnapshotStore, apply_batch
 from mind_lite.onboarding.analyze_readonly import analyze_folder
 
@@ -80,6 +81,31 @@ class ApiService:
             "state": run["state"],
             "snapshot_id": snapshot.snapshot_id,
             "applied_count": len(selected),
+        }
+
+    def rollback_run(self, run_id: str, payload: dict) -> dict:
+        if run_id not in self._runs:
+            raise ValueError(f"unknown run id: {run_id}")
+
+        requested_snapshot = payload.get("snapshot_id")
+        if requested_snapshot is None:
+            requested_snapshot = self._runs[run_id].get("snapshot_id")
+
+        if not isinstance(requested_snapshot, str) or not requested_snapshot:
+            raise ValueError("snapshot_id is required")
+
+        decision = validate_rollback_request(self._snapshot_store, run_id, requested_snapshot)
+        if not decision.allowed:
+            raise ValueError(decision.reason)
+
+        run = self._runs[run_id]
+        run["state"] = "rolled_back"
+        run["rolled_back_snapshot_id"] = requested_snapshot
+
+        return {
+            "run_id": run_id,
+            "state": run["state"],
+            "rolled_back_snapshot_id": requested_snapshot,
         }
 
     def _next_run_id(self) -> str:
