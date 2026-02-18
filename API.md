@@ -46,6 +46,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Ask endpoint with policy-gated provider routing implemented in `src/mind_lite/api/service.py`
 - Readiness endpoint implemented in `src/mind_lite/api/service.py`
 - Prometheus-style metrics endpoint implemented in `src/mind_lite/api/service.py`
+- Publish preparation endpoint implemented in `src/mind_lite/api/service.py`
 - Publish scoring endpoint implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
@@ -68,6 +69,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /runs/{run_id}/rollback`
 - `POST /policy/sensitivity/check`
 - `POST /ask`
+- `POST /publish/prepare`
 - `POST /publish/score`
 
 Run locally with:
