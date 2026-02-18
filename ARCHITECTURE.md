@@ -27,6 +27,8 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Coverage added in `tests/contracts/test_run_lifecycle_policy.py`
 - Sensitivity gate cloud-eligibility contract implemented in `src/mind_lite/contracts/sensitivity_gate.py`
 - Coverage added in `tests/contracts/test_sensitivity_gate_policy.py`
+- Budget guardrails contract implemented in `src/mind_lite/contracts/budget_guardrails.py`
+- Coverage added in `tests/contracts/test_budget_guardrails_policy.py`
 
 ---
 
