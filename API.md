@@ -36,6 +36,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Contract tests implemented in `tests/contracts/test_rollback_validation_policy.py`
 - Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service core implemented in `src/mind_lite/api/service.py`
+- Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
 
 ---
 
@@ -44,6 +45,8 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `GET /health`
 - `POST /onboarding/analyze-folder`
 - `GET /runs/{run_id}`
+- `GET /runs/{run_id}/proposals`
+- `POST /runs/{run_id}/apply`
 
 Run locally with:
 
