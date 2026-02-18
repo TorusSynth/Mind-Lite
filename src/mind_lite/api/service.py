@@ -356,6 +356,40 @@ class ApiService:
             },
         }
 
+    def publish_score(self, payload: dict) -> dict:
+        draft_id = payload.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            raise ValueError("draft_id is required")
+
+        content = payload.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("content is required")
+
+        normalized = content.strip()
+        word_count = len(normalized.split())
+        has_todo = "todo" in normalized.lower()
+
+        structure = min(1.0, word_count / 70.0)
+        if word_count >= 40 and "." in normalized:
+            clarity = 0.90
+        elif word_count >= 20:
+            clarity = 0.60
+        else:
+            clarity = 0.40
+        safety = 0.20 if has_todo else 0.90
+        overall = round((structure + clarity + safety) / 3.0, 2)
+
+        return {
+            "draft_id": draft_id.strip(),
+            "scores": {
+                "structure": round(structure, 2),
+                "clarity": round(clarity, 2),
+                "safety": round(safety, 2),
+                "overall": overall,
+            },
+            "gate_passed": overall >= 0.80,
+        }
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
