@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import asdict
 import json
 from pathlib import Path
@@ -16,6 +17,7 @@ from mind_lite.contracts.sensitivity_gate import (
 from mind_lite.contracts.rollback_validation import validate_rollback_request
 from mind_lite.contracts.snapshot_rollback import SnapshotStore, apply_batch
 from mind_lite.onboarding.analyze_readonly import analyze_folder
+from mind_lite.onboarding.proposal_llm import build_note_prompt, parse_llm_candidates
 
 
 class ApiService:
@@ -80,21 +82,35 @@ class ApiService:
             raise ValueError("folder_path is required")
 
         profile = analyze_folder(folder_path)
+        profile_payload = asdict(profile)
         run_id = self._next_run_id()
         run = {
             "run_id": run_id,
             "state": "analyzing",
-            "profile": asdict(profile),
+            "profile": profile_payload,
+            "diagnostics": [],
         }
         self._runs[run_id] = run
-        self._proposals_by_run[run_id] = self._build_initial_proposals(run_id)
+        note_proposals, diagnostics, note_success_count = self._build_note_candidate_proposals(
+            run_id, profile_payload.get("notes", [])
+        )
+        run["diagnostics"] = diagnostics
+        note_count = profile_payload.get("note_count", 0)
+
+        if note_success_count == 0 and diagnostics:
+            run["state"] = "failed_needs_attention"
+            self._proposals_by_run[run_id] = []
+        elif note_count == 0:
+            self._proposals_by_run[run_id] = []
+        else:
+            self._proposals_by_run[run_id] = note_proposals or self._build_initial_proposals(run_id)
         self._persist_state()
         return run
 
     def get_run(self, run_id: str) -> dict:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
-        return dict(self._runs[run_id])
+        return deepcopy(self._runs[run_id])
 
     def list_runs(self, filters: dict | None = None) -> dict:
         if filters is not None and not isinstance(filters, dict):
@@ -107,7 +123,7 @@ class ApiService:
                 raise ValueError("state filter must be a non-empty string")
             active_state = state_value
 
-        ordered = [dict(self._runs[run_id]) for run_id in sorted(self._runs.keys())]
+        ordered = [deepcopy(self._runs[run_id]) for run_id in sorted(self._runs.keys())]
         if active_state is not None:
             ordered = [run for run in ordered if run.get("state") == active_state]
         return {"runs": ordered}
@@ -128,7 +144,7 @@ class ApiService:
                 raise ValueError(f"{key} filter must be a non-empty string")
             active_filters[key] = value
 
-        proposals = [dict(item) for item in self._proposals_by_run.get(run_id, [])]
+        proposals = [deepcopy(item) for item in self._proposals_by_run.get(run_id, [])]
         for key, value in active_filters.items():
             proposals = [item for item in proposals if item.get(key) == value]
         return {"run_id": run_id, "proposals": proposals}
@@ -340,7 +356,7 @@ class ApiService:
                 cached = self._ask_response_by_event.get(normalized_event_id)
                 if cached is None:
                     raise ValueError("missing replay cache for duplicate event")
-                duplicated = dict(cached)
+                duplicated = deepcopy(cached)
                 duplicated["idempotency"] = {
                     "event_id": normalized_event_id,
                     "duplicate": True,
@@ -429,7 +445,7 @@ class ApiService:
             "reason": "accepted" if normalized_event_id is not None else "not_provided",
         }
         if normalized_event_id is not None:
-            self._ask_response_by_event[normalized_event_id] = dict(response)
+            self._ask_response_by_event[normalized_event_id] = deepcopy(response)
             self._persist_state()
         return response
 
@@ -501,7 +517,7 @@ class ApiService:
                 cached = self._publish_mark_response_by_event.get(normalized_event_id)
                 if cached is None:
                     raise ValueError("missing replay cache for duplicate event")
-                duplicated = dict(cached)
+                duplicated = deepcopy(cached)
                 duplicated["idempotency"] = {
                     "event_id": normalized_event_id,
                     "duplicate": True,
@@ -534,12 +550,12 @@ class ApiService:
         }
         self._gom_queue.append(item)
         if normalized_event_id is not None:
-            self._publish_mark_response_by_event[normalized_event_id] = dict(item)
+            self._publish_mark_response_by_event[normalized_event_id] = deepcopy(item)
         self._persist_state()
-        return dict(item)
+        return deepcopy(item)
 
     def list_gom_queue(self) -> dict:
-        items = [dict(item) for item in self._gom_queue]
+        items = deepcopy(self._gom_queue)
         return {
             "count": len(items),
             "items": items,
@@ -557,7 +573,7 @@ class ApiService:
                 replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
                 if not replay.duplicate:
                     replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
-                duplicated = dict(cached)
+                duplicated = deepcopy(cached)
                 duplicated["idempotency"] = {
                     "event_id": normalized_event_id,
                     "duplicate": True,
@@ -613,7 +629,7 @@ class ApiService:
             replay = apply_event(self._publish_export_replay_ledger, "publish_export", normalized_event_id)
             if replay.duplicate:
                 raise ValueError("missing replay cache for duplicate event")
-            self._publish_export_response_by_event[normalized_event_id] = dict(response)
+            self._publish_export_response_by_event[normalized_event_id] = deepcopy(response)
             self._persist_state()
         return response
 
@@ -629,7 +645,7 @@ class ApiService:
                 cached = self._publish_confirm_response_by_event.get(normalized_event_id)
                 if cached is None:
                     raise ValueError("missing replay cache for duplicate event")
-                duplicated = dict(cached)
+                duplicated = deepcopy(cached)
                 duplicated["idempotency"] = {
                     "event_id": normalized_event_id,
                     "duplicate": True,
@@ -668,12 +684,12 @@ class ApiService:
         }
         self._gom_published.append(published)
         if normalized_event_id is not None:
-            self._publish_confirm_response_by_event[normalized_event_id] = dict(published)
+            self._publish_confirm_response_by_event[normalized_event_id] = deepcopy(published)
         self._persist_state()
-        return dict(published)
+        return deepcopy(published)
 
     def list_published(self) -> dict:
-        items = [dict(item) for item in self._gom_published]
+        items = deepcopy(self._gom_published)
         return {
             "count": len(items),
             "items": items,
@@ -794,7 +810,7 @@ class ApiService:
                 cached = self._links_apply_response_by_event.get(normalized_event_id)
                 if cached is None:
                     raise ValueError("missing replay cache for duplicate event")
-                duplicated = dict(cached)
+                duplicated = deepcopy(cached)
                 duplicated["idempotency"] = {
                     "event_id": normalized_event_id,
                     "duplicate": True,
@@ -846,7 +862,7 @@ class ApiService:
             "reason": "accepted" if normalized_event_id is not None else "not_provided",
         }
         if normalized_event_id is not None:
-            self._links_apply_response_by_event[normalized_event_id] = dict(response)
+            self._links_apply_response_by_event[normalized_event_id] = deepcopy(response)
             self._persist_state()
         return response
 
@@ -966,6 +982,123 @@ class ApiService:
                 }
             )
         return proposals
+
+    def _build_note_candidate_proposals(self, run_id: str, notes: list[dict]) -> tuple[list[dict], list[dict], int]:
+        if not isinstance(notes, list) or not notes:
+            return [], [], 0
+
+        candidates: list[dict] = []
+        diagnostics: list[dict] = []
+        note_success_count = 0
+        for note in notes:
+            if not isinstance(note, dict):
+                continue
+
+            note_id = note.get("note_id")
+            try:
+                prompt = build_note_prompt(note)
+                raw = self._generate_note_candidate_response(note, prompt)
+            except ValueError as exc:
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_generation",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - defensive against provider failures
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_generation",
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if not isinstance(raw, str):
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_generation_empty_output",
+                        "error": "candidate output must be a non-empty string",
+                    }
+                )
+                continue
+
+            if not raw.strip():
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_generation_empty_output",
+                        "error": "candidate output was empty",
+                    }
+                )
+                continue
+            try:
+                parsed = parse_llm_candidates(raw)
+            except ValueError as exc:
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_parse",
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            if not parsed:
+                diagnostics.append(
+                    {
+                        "note_id": note_id,
+                        "stage": "candidate_parse_empty_candidates",
+                        "error": "candidate output did not include any proposals",
+                    }
+                )
+                continue
+
+            note_success_count += 1
+            candidates.extend(parsed)
+
+        proposals: list[dict] = []
+        for index, candidate in enumerate(candidates, start=1):
+            risk_tier = candidate["risk_tier"]
+            confidence = float(candidate["confidence"])
+            proposals.append(
+                {
+                    "proposal_id": f"{run_id}-prop-{index:02d}",
+                    "change_type": candidate["change_type"],
+                    "risk_tier": risk_tier,
+                    "confidence": confidence,
+                    "action_mode": decide_action_mode(risk_tier, confidence).value,
+                    "status": "pending",
+                    "note_id": candidate["note_id"],
+                    "details": dict(candidate["details"]),
+                }
+            )
+        return proposals, diagnostics, note_success_count
+
+    def _generate_note_candidate_response(self, note: dict, prompt: str) -> str:
+        del prompt
+        note_id = note.get("note_id") if isinstance(note, dict) else None
+        if not isinstance(note_id, str) or not note_id.strip():
+            note_id = "unknown"
+
+        payload = {
+            "proposals": [
+                {
+                    "note_id": note_id,
+                    "change_type": "tag_enrichment",
+                    "risk_tier": "low",
+                    "confidence": 0.8,
+                    "details": {
+                        "reason": "default_note_candidate",
+                    },
+                }
+            ]
+        }
+        return json.dumps(payload, sort_keys=True)
 
     def _classify_para(self, title: str) -> tuple[str, float]:
         lowered = title.lower()
