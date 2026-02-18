@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -206,6 +207,250 @@ class ApiServiceTests(unittest.TestCase):
         service = ApiService()
         with self.assertRaises(ValueError):
             service.analyze_folder({"folder_path": "/tmp/does-not-exist-ml", "mode": "analyze"})
+
+    def test_analyze_folders_creates_parent_run_with_batch_entries(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "one"
+            folder_two = root / "two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+            service._proposals_by_run["run_1001"] = [{"proposal_id": "run_1001-prop-01"}]
+            service._proposals_by_run["run_1002"] = [
+                {"proposal_id": "run_1002-prop-01"},
+                {"proposal_id": "run_1002-prop-02"},
+            ]
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                if folder_path == str(folder_one):
+                    return {
+                        "run_id": "run_1001",
+                        "state": "ready_safe_auto",
+                        "profile": {"note_count": 3},
+                        "diagnostics": [],
+                    }
+                if folder_path == str(folder_two):
+                    return {
+                        "run_id": "run_1002",
+                        "state": "awaiting_review",
+                        "profile": {"note_count": 1},
+                        "diagnostics": [{"note_id": "n2", "error": "parse warning"}],
+                    }
+                raise AssertionError(f"unexpected folder path: {folder_path}")
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(folder_one), str(folder_two)],
+                        "mode": "analyze",
+                    }
+                )
+
+        self.assertIn("run_id", parent)
+        self.assertEqual(parent["batch_total"], 2)
+        self.assertEqual(parent["batch_completed"], 2)
+        self.assertEqual(len(parent["batches"]), 2)
+        self.assertEqual(parent["diagnostics"], [])
+        self.assertEqual(parent["state"], "ready_safe_auto")
+        stored_parent = service.get_run(parent["run_id"])
+        self.assertEqual(stored_parent["run_id"], parent["run_id"])
+        self.assertEqual(stored_parent["state"], "ready_safe_auto")
+
+        first = parent["batches"][0]
+        second = parent["batches"][1]
+        self.assertEqual(
+            set(first.keys()),
+            {"batch_id", "folder_path", "run_id", "state", "proposal_count", "diagnostics_count"},
+        )
+        self.assertEqual(first["batch_id"], "batch_0001")
+        self.assertEqual(first["folder_path"], str(folder_one))
+        self.assertEqual(first["run_id"], "run_1001")
+        self.assertEqual(first["state"], "ready_safe_auto")
+        self.assertEqual(first["proposal_count"], 1)
+        self.assertEqual(first["diagnostics_count"], 0)
+        self.assertEqual(second["batch_id"], "batch_0002")
+        self.assertEqual(second["folder_path"], str(folder_two))
+        self.assertEqual(second["run_id"], "run_1002")
+        self.assertEqual(second["state"], "awaiting_review")
+        self.assertEqual(second["proposal_count"], 2)
+        self.assertEqual(second["diagnostics_count"], 1)
+
+    def test_analyze_folders_handles_partial_child_failures(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            healthy = root / "healthy"
+            broken = root / "broken"
+            healthy.mkdir()
+            broken.mkdir()
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                if folder_path == str(healthy):
+                    return {
+                        "run_id": "run_2001",
+                        "state": "ready_safe_auto",
+                        "profile": {"note_count": 2},
+                        "diagnostics": [],
+                    }
+                if folder_path == str(broken):
+                    raise ValueError("child analysis failed")
+                raise AssertionError(f"unexpected folder path: {folder_path}")
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(healthy), str(broken)],
+                        "mode": "analyze",
+                    }
+                )
+
+        self.assertIn("run_id", parent)
+        self.assertEqual(parent["batch_total"], 2)
+        self.assertEqual(parent["batch_completed"], 2)
+        self.assertEqual(len(parent["batches"]), 2)
+        self.assertEqual(parent["state"], "ready_safe_auto")
+
+        batches_by_path = {item["folder_path"]: item for item in parent["batches"]}
+        self.assertEqual(batches_by_path[str(healthy)]["state"], "ready_safe_auto")
+        self.assertEqual(batches_by_path[str(broken)]["state"], "failed_needs_attention")
+        self.assertIsNone(batches_by_path[str(broken)]["run_id"])
+        self.assertEqual(batches_by_path[str(broken)]["proposal_count"], 0)
+        self.assertEqual(batches_by_path[str(broken)]["diagnostics_count"], 1)
+
+        self.assertEqual(len(parent["diagnostics"]), 1)
+        self.assertEqual(parent["diagnostics"][0]["batch_id"], "batch_0002")
+        self.assertEqual(parent["diagnostics"][0]["folder_path"], str(broken))
+        self.assertIn("error", parent["diagnostics"][0])
+
+    def test_analyze_folders_sets_failed_needs_attention_when_all_children_fail(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            broken_one = root / "broken_one"
+            broken_two = root / "broken_two"
+            broken_one.mkdir()
+            broken_two.mkdir()
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                raise ValueError(f"failed child folder: {folder_path}")
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(broken_one), str(broken_two)],
+                        "mode": "analyze",
+                    }
+                )
+
+        self.assertEqual(parent["batch_total"], 2)
+        self.assertEqual(parent["batch_completed"], 2)
+        self.assertEqual(parent["state"], "failed_needs_attention")
+        self.assertEqual(len(parent["diagnostics"]), 2)
+        self.assertTrue(all(item["state"] == "failed_needs_attention" for item in parent["batches"]))
+        self.assertEqual(parent["batches"][0]["batch_id"], "batch_0001")
+        self.assertEqual(parent["batches"][1]["batch_id"], "batch_0002")
+
+    def test_analyze_folders_rejects_invalid_folder_paths_payload(self):
+        service = ApiService()
+
+        invalid_payloads = [
+            {},
+            {"folder_paths": []},
+            {"folder_paths": [123]},
+            {"folder_paths": ["   "]},
+        ]
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(ValueError, "folder_paths"):
+                    service.analyze_folders(payload)
+
+    def test_analyze_folders_raises_unexpected_child_errors(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder = root / "folder"
+            folder.mkdir()
+
+            with patch.object(service, "_analyze_folder_run", side_effect=RuntimeError("unexpected failure")):
+                with self.assertRaisesRegex(RuntimeError, "unexpected failure"):
+                    service.analyze_folders({"folder_paths": [str(folder)], "mode": "analyze"})
+
+    def test_analyze_folders_persists_state_once_after_batch_completion(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "one"
+            folder_two = root / "two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+            (folder_one / "a.md").write_text("# A\n[[B]]", encoding="utf-8")
+            (folder_two / "b.md").write_text("# B", encoding="utf-8")
+
+            with patch.object(service, "_persist_state") as persist_state:
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(folder_one), str(folder_two)],
+                        "mode": "analyze",
+                    }
+                )
+
+        self.assertEqual(parent["batch_completed"], 2)
+        self.assertEqual(persist_state.call_count, 1)
+
+    def test_analyze_folders_integration_persists_parent_and_children_deterministically(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+            folder_one = root / "one"
+            folder_two = root / "two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+            (folder_one / "a.md").write_text("# A\n[[B]]", encoding="utf-8")
+            (folder_two / "b.md").write_text("# B", encoding="utf-8")
+
+            service = ApiService(state_file=str(state_file))
+            parent = service.analyze_folders(
+                {
+                    "folder_paths": [str(folder_one), str(folder_two)],
+                    "mode": "analyze",
+                }
+            )
+
+            self.assertEqual(parent["run_id"], "run_0001")
+            self.assertEqual(parent["state"], "ready_safe_auto")
+            self.assertEqual(parent["batch_completed"], 2)
+            self.assertEqual(
+                [item["run_id"] for item in parent["batches"]],
+                ["run_0002", "run_0003"],
+            )
+
+            payload = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_counter"], 3)
+            self.assertEqual(
+                sorted(payload["runs"].keys()),
+                ["run_0001", "run_0002", "run_0003"],
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            runs = reloaded.list_runs()["runs"]
+            self.assertEqual([item["run_id"] for item in runs], ["run_0001", "run_0002", "run_0003"])
+            self.assertEqual(reloaded.get_run("run_0001")["batch_completed"], 2)
+            self.assertEqual(reloaded.get_run("run_0002")["state"], "ready_safe_auto")
+            self.assertEqual(reloaded.get_run("run_0003")["state"], "ready_safe_auto")
+            self.assertEqual(len(reloaded.get_run_proposals("run_0002")["proposals"]), 1)
+            self.assertEqual(len(reloaded.get_run_proposals("run_0003")["proposals"]), 1)
 
     def test_proposals_list_and_apply_flow(self):
         service = ApiService()

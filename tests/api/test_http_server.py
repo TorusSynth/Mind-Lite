@@ -257,6 +257,89 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 200)
         self.assertIn(body["state"], {"ready_safe_auto", "awaiting_review"})
 
+    def test_analyze_folders_endpoint_returns_parent_batch_summary(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "folder-one"
+            folder_two = root / "folder-two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+            (folder_one / "a.md").write_text("[[b]]", encoding="utf-8")
+            (folder_two / "c.md").write_text("[[d]]", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {
+                "folder_paths": [str(folder_one), str(folder_two)],
+                "mode": "analyze",
+            }
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folders",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = json.loads(resp.read().decode("utf-8"))
+            conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertIn("run_id", body)
+        self.assertEqual(body["batch_total"], 2)
+        self.assertEqual(body["batch_completed"], 2)
+        self.assertEqual(len(body["batches"]), 2)
+        self.assertEqual(body["diagnostics"], [])
+        self.assertEqual({item["folder_path"] for item in body["batches"]}, {str(folder_one), str(folder_two)})
+
+    def test_analyze_folders_endpoint_handles_partial_failures(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            valid_folder = root / "valid"
+            missing_folder = root / "missing"
+            valid_folder.mkdir()
+            (valid_folder / "a.md").write_text("[[b]]", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {
+                "folder_paths": [str(valid_folder), str(missing_folder)],
+                "mode": "analyze",
+            }
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folders",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = json.loads(resp.read().decode("utf-8"))
+            conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["batch_total"], 2)
+        self.assertEqual(body["batch_completed"], 2)
+        self.assertEqual(len(body["batches"]), 2)
+        self.assertEqual(len(body["diagnostics"]), 1)
+
+        failed_batch = next(batch for batch in body["batches"] if batch["folder_path"] == str(missing_folder))
+        self.assertEqual(failed_batch["run_id"], None)
+        self.assertEqual(failed_batch["state"], "failed_needs_attention")
+        self.assertEqual(failed_batch["proposal_count"], 0)
+        self.assertEqual(failed_batch["diagnostics_count"], 1)
+
+    def test_analyze_folders_endpoint_rejects_invalid_payload(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/onboarding/analyze-folders",
+            body=json.dumps({"folder_paths": "not-a-list"}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("folder_paths must be a non-empty list", body["error"])
+
     def test_apply_endpoint_rejects_unapproved_run_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
