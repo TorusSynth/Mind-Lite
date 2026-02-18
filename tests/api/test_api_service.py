@@ -142,6 +142,32 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(published["count"], 1)
             self.assertEqual(published["items"][0]["draft_id"], "draft_published")
 
+    def test_persists_ask_idempotency_replay_cache_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            first = service.ask(
+                {
+                    "query": "What should I work on?",
+                    "local_confidence": 0.55,
+                    "event_id": "evt_001",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            replayed = reloaded.ask(
+                {
+                    "query": "Different prompt should be ignored on duplicate",
+                    "local_confidence": 0.10,
+                    "event_id": "evt_001",
+                }
+            )
+
+            self.assertTrue(replayed["idempotency"]["duplicate"])
+            self.assertEqual(replayed["answer"]["text"], first["answer"]["text"])
+
     def test_sensitivity_check_blocks_payload_with_secret_pattern(self):
         service = ApiService()
 

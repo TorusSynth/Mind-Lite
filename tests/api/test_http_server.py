@@ -320,6 +320,71 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(published_body["count"], 1)
             self.assertEqual(published_body["items"][0]["draft_id"], "draft_published")
 
+    def test_persists_ask_idempotency_replay_across_server_restarts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "server-state.json"
+
+            first_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            first_thread = threading.Thread(target=first_server.serve_forever, daemon=True)
+            first_thread.start()
+            time.sleep(0.01)
+            first_host, first_port = first_server.server_address
+
+            conn = HTTPConnection(first_host, first_port, timeout=2)
+            conn.request(
+                "POST",
+                "/ask",
+                body=json.dumps(
+                    {
+                        "query": "What should I work on?",
+                        "local_confidence": 0.55,
+                        "event_id": "evt_001",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            first_resp = conn.getresponse()
+            first_body = json.loads(first_resp.read().decode("utf-8"))
+            self.assertEqual(first_resp.status, 200)
+            self.assertFalse(first_body["idempotency"]["duplicate"])
+            conn.close()
+
+            first_server.shutdown()
+            first_server.server_close()
+            first_thread.join(timeout=1)
+
+            second_server = create_server(host="127.0.0.1", port=0, state_file=str(state_file))
+            second_thread = threading.Thread(target=second_server.serve_forever, daemon=True)
+            second_thread.start()
+            time.sleep(0.01)
+            second_host, second_port = second_server.server_address
+
+            conn = HTTPConnection(second_host, second_port, timeout=2)
+            conn.request(
+                "POST",
+                "/ask",
+                body=json.dumps(
+                    {
+                        "query": "Different prompt should be ignored on duplicate",
+                        "local_confidence": 0.10,
+                        "event_id": "evt_001",
+                    }
+                ),
+                headers={"Content-Type": "application/json"},
+            )
+            second_resp = conn.getresponse()
+            second_body = json.loads(second_resp.read().decode("utf-8"))
+            conn.close()
+
+            second_server.shutdown()
+            second_server.server_close()
+            second_thread.join(timeout=1)
+
+            self.assertEqual(second_resp.status, 200)
+            self.assertTrue(second_body["idempotency"]["duplicate"])
+            self.assertEqual(second_body["answer"]["text"], first_body["answer"]["text"])
+
     def test_sensitivity_check_endpoint(self):
         payload = {
             "frontmatter": {},
