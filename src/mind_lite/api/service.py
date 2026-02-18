@@ -7,6 +7,7 @@ from mind_lite.contracts.action_tiering import decide_action_mode
 from mind_lite.contracts.budget_guardrails import evaluate_budget
 from mind_lite.contracts.idempotency_replay import RunReplayLedger, apply_event
 from mind_lite.contracts.provider_routing import select_provider, RoutingInput
+from mind_lite.contracts.run_lifecycle import RunState, validate_transition
 from mind_lite.contracts.sensitivity_gate import (
     PROTECTED_PATH_PREFIXES,
     PROTECTED_TAGS,
@@ -86,11 +87,12 @@ class ApiService:
         run_id = self._next_run_id()
         run = {
             "run_id": run_id,
-            "state": "analyzing",
+            "state": RunState.QUEUED.value,
             "profile": profile_payload,
             "diagnostics": [],
         }
         self._runs[run_id] = run
+        self._transition_run_state(run, RunState.ANALYZING)
         note_proposals, diagnostics, note_success_count = self._build_note_candidate_proposals(
             run_id, profile_payload.get("notes", [])
         )
@@ -98,14 +100,20 @@ class ApiService:
         note_count = profile_payload.get("note_count", 0)
 
         if note_success_count == 0 and diagnostics:
-            run["state"] = "failed_needs_attention"
+            self._transition_run_state(run, RunState.FAILED_NEEDS_ATTENTION)
             self._proposals_by_run[run_id] = []
         elif note_count == 0:
             self._proposals_by_run[run_id] = []
+            self._transition_run_state(run, RunState.AWAITING_REVIEW)
         else:
-            self._proposals_by_run[run_id] = note_proposals or self._build_initial_proposals(run_id)
+            proposals = note_proposals or self._build_initial_proposals(run_id)
+            self._proposals_by_run[run_id] = proposals
+            if any(proposal.get("action_mode") == "auto" for proposal in proposals):
+                self._transition_run_state(run, RunState.READY_SAFE_AUTO)
+            else:
+                self._transition_run_state(run, RunState.AWAITING_REVIEW)
         self._persist_state()
-        return run
+        return deepcopy(run)
 
     def get_run(self, run_id: str) -> dict:
         if run_id not in self._runs:
@@ -153,6 +161,10 @@ class ApiService:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
 
+        run = self._runs[run_id]
+        if run.get("state") not in {RunState.AWAITING_REVIEW.value, RunState.READY_SAFE_AUTO.value}:
+            raise ValueError("run state must be awaiting_review or ready_safe_auto")
+
         requested_types = payload.get("change_types")
         if requested_types is not None:
             if not isinstance(requested_types, list) or not all(isinstance(x, str) for x in requested_types):
@@ -175,8 +187,9 @@ class ApiService:
         for proposal in selected:
             proposal["status"] = "approved"
 
-        run = self._runs[run_id]
-        run["state"] = "approved"
+        if run.get("state") == RunState.READY_SAFE_AUTO.value:
+            self._transition_run_state(run, RunState.AWAITING_REVIEW)
+        self._transition_run_state(run, RunState.APPROVED)
         self._persist_state()
 
         return {
@@ -188,6 +201,10 @@ class ApiService:
     def apply_run(self, run_id: str, payload: dict) -> dict:
         if run_id not in self._runs:
             raise ValueError(f"unknown run id: {run_id}")
+
+        run = self._runs[run_id]
+        if run.get("state") != RunState.APPROVED.value:
+            raise ValueError("run state must be approved")
 
         requested_types = payload.get("change_types")
         if requested_types is not None:
@@ -214,8 +231,7 @@ class ApiService:
         changed_note_ids = [proposal["proposal_id"] for proposal in selected]
         snapshot = apply_batch(self._snapshot_store, run_id, changed_note_ids)
 
-        run = self._runs[run_id]
-        run["state"] = "applied"
+        self._transition_run_state(run, RunState.APPLIED)
         run["snapshot_id"] = snapshot.snapshot_id
         self._persist_state()
 
@@ -869,6 +885,17 @@ class ApiService:
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
+
+    def _transition_run_state(self, run: dict, target: RunState) -> None:
+        current_value = run.get("state")
+        try:
+            current_state = RunState(current_value)
+        except ValueError as exc:
+            raise ValueError(f"invalid run state transition: {current_value} -> {target.value}") from exc
+
+        if not validate_transition(current_state, target):
+            raise ValueError(f"invalid run state transition: {current_state.value} -> {target.value}")
+        run["state"] = target.value
 
     def _load_state_if_present(self) -> None:
         if self._state_file is None or not self._state_file.exists():

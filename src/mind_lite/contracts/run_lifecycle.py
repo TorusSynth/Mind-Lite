@@ -16,7 +16,7 @@ class RunState(str, Enum):
 
 _ALLOWED_FORWARD_TRANSITIONS: dict[RunState, set[RunState]] = {
     RunState.QUEUED: {RunState.ANALYZING},
-    RunState.ANALYZING: {RunState.READY_SAFE_AUTO},
+    RunState.ANALYZING: {RunState.READY_SAFE_AUTO, RunState.AWAITING_REVIEW},
     RunState.READY_SAFE_AUTO: {RunState.AWAITING_REVIEW},
     RunState.AWAITING_REVIEW: {RunState.APPROVED},
     RunState.APPROVED: {RunState.APPLIED},
