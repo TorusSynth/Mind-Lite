@@ -190,6 +190,13 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(list_resp.status, 200)
             self.assertEqual(listed["run_id"], run_id)
 
+            conn.request("GET", f"/runs/{run_id}/proposals?risk_tier=low")
+            filtered_resp = conn.getresponse()
+            filtered = json.loads(filtered_resp.read().decode("utf-8"))
+            self.assertEqual(filtered_resp.status, 200)
+            self.assertEqual(len(filtered["proposals"]), 1)
+            self.assertEqual(filtered["proposals"][0]["risk_tier"], "low")
+
             approve_payload = {"change_types": ["tag_enrichment"]}
             conn.request(
                 "POST",

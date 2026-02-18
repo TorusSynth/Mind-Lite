@@ -100,6 +100,25 @@ class ApiServiceTests(unittest.TestCase):
             self.assertEqual(rollback_result["state"], "rolled_back")
             self.assertEqual(rollback_result["rolled_back_snapshot_id"], apply_result["snapshot_id"])
 
+    def test_get_run_proposals_supports_filters(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            run_id = run["run_id"]
+
+            low_only = service.get_run_proposals(run_id, {"risk_tier": "low"})
+            self.assertEqual(len(low_only["proposals"]), 1)
+            self.assertEqual(low_only["proposals"][0]["risk_tier"], "low")
+
+            service.approve_run(run_id, {"change_types": ["tag_enrichment"]})
+            approved_only = service.get_run_proposals(run_id, {"status": "approved"})
+            self.assertEqual(len(approved_only["proposals"]), 1)
+            self.assertEqual(approved_only["proposals"][0]["status"], "approved")
+
     def test_list_runs_returns_created_runs(self):
         service = ApiService()
         with tempfile.TemporaryDirectory() as temp_dir:
