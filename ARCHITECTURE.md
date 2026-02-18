@@ -31,6 +31,8 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Coverage added in `tests/contracts/test_budget_guardrails_policy.py`
 - Snapshot rollback contract implemented in `src/mind_lite/contracts/snapshot_rollback.py`
 - Coverage added in `tests/contracts/test_snapshot_rollback_policy.py`
+- Provider routing fallback contract implemented in `src/mind_lite/contracts/provider_routing.py`
+- Coverage added in `tests/contracts/test_provider_routing_policy.py`
 
 ---
 
