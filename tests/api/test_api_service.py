@@ -411,6 +411,30 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.links_propose({"source_note_id": "n1", "candidate_notes": []})
 
+    def test_links_apply_marks_selected_links_as_applied(self):
+        service = ApiService()
+
+        result = service.links_apply(
+            {
+                "source_note_id": "n1",
+                "links": [
+                    {"target_note_id": "n2", "confidence": 0.88},
+                    {"target_note_id": "n3", "confidence": 0.79},
+                ],
+                "min_confidence": 0.8,
+            }
+        )
+
+        self.assertEqual(result["source_note_id"], "n1")
+        self.assertEqual(result["applied_count"], 1)
+        self.assertEqual(result["applied_links"][0]["target_note_id"], "n2")
+
+    def test_links_apply_requires_non_empty_links(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.links_apply({"source_note_id": "n1", "links": []})
+
 
 if __name__ == "__main__":
     unittest.main()

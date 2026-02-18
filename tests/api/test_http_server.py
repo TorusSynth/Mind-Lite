@@ -744,6 +744,45 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_links_apply_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        payload = {
+            "source_note_id": "n1",
+            "links": [
+                {"target_note_id": "n2", "confidence": 0.88},
+                {"target_note_id": "n3", "confidence": 0.79},
+            ],
+            "min_confidence": 0.8,
+        }
+        conn.request(
+            "POST",
+            "/links/apply",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["source_note_id"], "n1")
+        self.assertEqual(body["applied_count"], 1)
+
+    def test_links_apply_endpoint_rejects_empty_links(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/links/apply",
+            body=json.dumps({"source_note_id": "n1", "links": []}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()
