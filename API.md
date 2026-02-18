@@ -1,6 +1,6 @@
 # Mind Lite - API Specification v2.0 (Planning)
 
-**Status:** Draft Approved for Design, Not Yet Implemented  
+**Status:** Initial Implementation In Progress  
 **Last Updated:** 2026-02-18  
 **Base URL (target):** `http://localhost:8000`
 
@@ -10,7 +10,7 @@
 
 This API spec defines planned behavior for Mind Lite v1, aligned with the approved architecture and roadmap.
 
-Implementation has not started. This is the contract to build against.
+Implementation has started with a runnable local HTTP bootstrap and contract-backed onboarding analysis.
 
 ---
 
@@ -34,6 +34,20 @@ Implementation has not started. This is the contract to build against.
 - Contract tests implemented in `tests/contracts/test_idempotency_replay_policy.py`
 - Rollback validation invariants contract implemented in `src/mind_lite/contracts/rollback_validation.py`
 - Contract tests implemented in `tests/contracts/test_rollback_validation_policy.py`
+- Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
+- API service core implemented in `src/mind_lite/api/service.py`
+
+---
+
+## Runnable Endpoints (Current)
+
+- `GET /health`
+- `POST /onboarding/analyze-folder`
+- `GET /runs/{run_id}`
+
+Run locally with:
+
+`PYTHONPATH=src python3 -m mind_lite.api`
 
 ---
 
