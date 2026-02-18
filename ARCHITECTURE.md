@@ -27,6 +27,8 @@ Architecture-level milestones completed:
 - Runnable HTTP API with file-backed state persistence implemented
 - Onboarding read-only analysis extended with note-level profiles and LLM proposal normalization
 - Onboarding staged run outcomes implemented (`ready_safe_auto`, `awaiting_review`, `failed_needs_attention`)
+- Analyze-folders batch onboarding endpoint/service implemented with parent run orchestration
+- Analyze-folders parent batch summary counters and aggregate state transitions implemented (`batch_total`, `batch_completed`, `batches`, final `state`)
 - Lifecycle-validated state transitions enforced for analyze/approve/apply paths
 - Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
 

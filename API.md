@@ -65,6 +65,8 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Analyze-folder note-candidate proposal integration implemented in `src/mind_lite/api/service.py`
 - Analyze-folder partial/all-failure diagnostics and `failed_needs_attention` handling implemented in `src/mind_lite/api/service.py`
 - Analyze-folder staged run outcomes (`ready_safe_auto`, `awaiting_review`) implemented in `src/mind_lite/api/service.py`
+- Analyze-folders batch onboarding endpoint/service implemented in `src/mind_lite/api/http_server.py` and `src/mind_lite/api/service.py`
+- Analyze-folders parent batch summary counters and aggregate state transitions (`batch_total`, `batch_completed`, `batches`, final `state`) implemented in `src/mind_lite/api/service.py`
 - Run lifecycle transition validation for analyze/approve/apply implemented in `src/mind_lite/api/service.py`
 - Run lifecycle contract supports direct `analyzing -> awaiting_review` transition in `src/mind_lite/contracts/run_lifecycle.py`
 - Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
@@ -92,6 +94,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `GET /publish/gom-queue`
 - `GET /publish/published`
 - `POST /onboarding/analyze-folder`
+- `POST /onboarding/analyze-folders`
 - `POST /organize/classify`
 - `POST /organize/propose-structure`
 - `POST /links/propose`
@@ -218,6 +221,46 @@ Response:
     "orphan_notes": 19,
     "link_density": 0.24
   }
+}
+```
+
+### POST `/onboarding/analyze-folders`
+Analyze multiple folders in a single parent run and return per-batch summaries.
+
+Request:
+```json
+{
+  "folder_paths": ["Projects/Atlas", "Areas/Health"],
+  "mode": "analyze"
+}
+```
+
+Response:
+```json
+{
+  "run_id": "run_abc124",
+  "state": "ready_safe_auto",
+  "batch_total": 2,
+  "batch_completed": 2,
+  "batches": [
+    {
+      "batch_id": "batch_0001",
+      "folder_path": "Projects/Atlas",
+      "run_id": "run_abc125",
+      "state": "ready_safe_auto",
+      "proposal_count": 12,
+      "diagnostics_count": 0
+    },
+    {
+      "batch_id": "batch_0002",
+      "folder_path": "Areas/Health",
+      "run_id": "run_abc126",
+      "state": "awaiting_review",
+      "proposal_count": 6,
+      "diagnostics_count": 1
+    }
+  ],
+  "diagnostics": []
 }
 ```
 
