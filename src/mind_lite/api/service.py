@@ -98,6 +98,7 @@ class ApiService:
             "batch_total": len(folder_paths),
             "batch_completed": 0,
             "batches": [],
+            "applied_batch_ids": [],
             "diagnostics": [],
         }
         self._runs[run_id] = run
@@ -122,6 +123,7 @@ class ApiService:
                     "state": child_run.get("state"),
                     "proposal_count": proposal_count,
                     "diagnostics_count": child_diagnostics_count,
+                    "snapshot_id": None,
                 }
                 run["batches"].append(batch_summary)
                 if isinstance(batch_summary["state"], str):
@@ -135,6 +137,7 @@ class ApiService:
                         "state": RunState.FAILED_NEEDS_ATTENTION.value,
                         "proposal_count": 0,
                         "diagnostics_count": 1,
+                        "snapshot_id": None,
                     }
                 )
                 run["diagnostics"].append(
@@ -321,6 +324,10 @@ class ApiService:
         self._transition_run_state(run, RunState.APPLIED)
         run["snapshot_id"] = snapshot.snapshot_id
         self._persist_state()
+
+        parent_run_id = self._find_parent_run_for_child(run_id)
+        if parent_run_id is not None:
+            self._update_batch_checkpoint(parent_run_id, run_id, snapshot.snapshot_id)
 
         return {
             "run_id": run_id,
@@ -968,6 +975,35 @@ class ApiService:
             self._links_apply_response_by_event[normalized_event_id] = deepcopy(response)
             self._persist_state()
         return response
+
+    def _find_parent_run_for_child(self, child_run_id: str) -> str | None:
+        for run_id, run in self._runs.items():
+            batches = run.get("batches", [])
+            if not isinstance(batches, list):
+                continue
+            for batch in batches:
+                if isinstance(batch, dict) and batch.get("run_id") == child_run_id:
+                    return run_id
+        return None
+
+    def _update_batch_checkpoint(self, parent_run_id: str, child_run_id: str, snapshot_id: str) -> None:
+        parent = self._runs.get(parent_run_id)
+        if parent is None:
+            return
+        batches = parent.get("batches", [])
+        if not isinstance(batches, list):
+            return
+        for batch in batches:
+            if isinstance(batch, dict) and batch.get("run_id") == child_run_id:
+                batch["snapshot_id"] = snapshot_id
+                break
+        applied_batch_ids = parent.get("applied_batch_ids", [])
+        if not isinstance(applied_batch_ids, list):
+            applied_batch_ids = []
+        if child_run_id not in applied_batch_ids:
+            applied_batch_ids.append(child_run_id)
+            parent["applied_batch_ids"] = applied_batch_ids
+        self._persist_state()
 
     def _next_run_id(self) -> str:
         self._run_counter += 1
