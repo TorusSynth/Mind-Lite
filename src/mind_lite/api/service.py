@@ -79,6 +79,92 @@ class ApiService:
 
     def analyze_folder(self, payload: dict) -> dict:
         folder_path = payload.get("folder_path")
+        mode = payload.get("mode", "analyze")
+        run = self._analyze_folder_run(folder_path, mode=mode, persist=True)
+        return deepcopy(run)
+
+    def analyze_folders(self, payload: dict) -> dict:
+        folder_paths = payload.get("folder_paths")
+        if not isinstance(folder_paths, list) or not folder_paths:
+            raise ValueError("folder_paths must be a non-empty list of non-empty strings")
+        if any(not isinstance(path, str) or not path.strip() for path in folder_paths):
+            raise ValueError("folder_paths must be a non-empty list of non-empty strings")
+
+        mode = payload.get("mode", "analyze")
+        run_id = self._next_run_id()
+        run = {
+            "run_id": run_id,
+            "state": RunState.QUEUED.value,
+            "batch_total": len(folder_paths),
+            "batch_completed": 0,
+            "batches": [],
+            "diagnostics": [],
+        }
+        self._runs[run_id] = run
+        self._transition_run_state(run, RunState.ANALYZING)
+
+        child_states: list[str] = []
+        for index, folder_path in enumerate(folder_paths, start=1):
+            batch_id = f"batch_{index:04d}"
+            try:
+                child_run = self._analyze_folder_run(folder_path, mode=mode, persist=False)
+                child_run_id = child_run.get("run_id")
+                child_diagnostics = child_run.get("diagnostics", [])
+                child_diagnostics_count = len(child_diagnostics) if isinstance(child_diagnostics, list) else 0
+                proposal_count = 0
+                if isinstance(child_run_id, str):
+                    proposal_count = len(self._proposals_by_run.get(child_run_id, []))
+
+                batch_summary = {
+                    "batch_id": batch_id,
+                    "folder_path": folder_path,
+                    "run_id": child_run_id,
+                    "state": child_run.get("state"),
+                    "proposal_count": proposal_count,
+                    "diagnostics_count": child_diagnostics_count,
+                }
+                run["batches"].append(batch_summary)
+                if isinstance(batch_summary["state"], str):
+                    child_states.append(batch_summary["state"])
+            except (ValueError, OSError) as exc:
+                run["batches"].append(
+                    {
+                        "batch_id": batch_id,
+                        "folder_path": folder_path,
+                        "run_id": None,
+                        "state": RunState.FAILED_NEEDS_ATTENTION.value,
+                        "proposal_count": 0,
+                        "diagnostics_count": 1,
+                    }
+                )
+                run["diagnostics"].append(
+                    {
+                        "batch_id": batch_id,
+                        "folder_path": folder_path,
+                        "error": str(exc),
+                    }
+                )
+                child_states.append(RunState.FAILED_NEEDS_ATTENTION.value)
+            finally:
+                run["batch_completed"] = int(run["batch_completed"]) + 1
+
+        all_failed = bool(child_states) and all(
+            state == RunState.FAILED_NEEDS_ATTENTION.value for state in child_states
+        )
+        any_safe_auto = any(state == RunState.READY_SAFE_AUTO.value for state in child_states)
+
+        if all_failed:
+            self._transition_run_state(run, RunState.FAILED_NEEDS_ATTENTION)
+        elif any_safe_auto:
+            self._transition_run_state(run, RunState.READY_SAFE_AUTO)
+        else:
+            self._transition_run_state(run, RunState.AWAITING_REVIEW)
+
+        self._persist_state()
+        return deepcopy(run)
+
+    def _analyze_folder_run(self, folder_path: object, *, mode: str, persist: bool) -> dict:
+        del mode
         if not isinstance(folder_path, str) or not folder_path:
             raise ValueError("folder_path is required")
 
@@ -112,8 +198,9 @@ class ApiService:
                 self._transition_run_state(run, RunState.READY_SAFE_AUTO)
             else:
                 self._transition_run_state(run, RunState.AWAITING_REVIEW)
-        self._persist_state()
-        return deepcopy(run)
+        if persist:
+            self._persist_state()
+        return run
 
     def get_run(self, run_id: str) -> dict:
         if run_id not in self._runs:

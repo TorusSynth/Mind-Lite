@@ -95,6 +95,16 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, result)
                 return
 
+            if path == "/onboarding/analyze-folders":
+                try:
+                    result = service.analyze_folders(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+
+                self._write_json(200, result)
+                return
+
             if path == "/policy/sensitivity/check":
                 try:
                     result = service.check_sensitivity(body)
