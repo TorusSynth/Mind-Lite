@@ -587,6 +587,50 @@ class ApiService:
             "suggestions": suggestions,
         }
 
+    def links_apply(self, payload: dict) -> dict:
+        source_note_id = payload.get("source_note_id")
+        if not isinstance(source_note_id, str) or not source_note_id.strip():
+            raise ValueError("source_note_id is required")
+
+        links = payload.get("links")
+        if not isinstance(links, list) or not links:
+            raise ValueError("links must be a non-empty list")
+
+        min_confidence = payload.get("min_confidence", 0.0)
+        if not isinstance(min_confidence, (float, int)):
+            raise ValueError("min_confidence must be a number")
+        min_confidence = float(min_confidence)
+
+        applied_links = []
+        for link in links:
+            if not isinstance(link, dict):
+                raise ValueError("each link must be an object")
+
+            target_note_id = link.get("target_note_id")
+            confidence = link.get("confidence")
+            if not isinstance(target_note_id, str) or not target_note_id.strip():
+                raise ValueError("target_note_id is required")
+            if not isinstance(confidence, (float, int)):
+                raise ValueError("confidence must be a number")
+
+            confidence = float(confidence)
+            if confidence < min_confidence:
+                continue
+
+            applied_links.append(
+                {
+                    "target_note_id": target_note_id.strip(),
+                    "confidence": confidence,
+                    "status": "applied",
+                }
+            )
+
+        return {
+            "source_note_id": source_note_id.strip(),
+            "applied_count": len(applied_links),
+            "applied_links": applied_links,
+        }
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
