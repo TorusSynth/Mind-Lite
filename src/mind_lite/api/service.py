@@ -22,6 +22,7 @@ class ApiService:
         self._runs: dict[str, dict] = {}
         self._proposals_by_run: dict[str, list[dict]] = {}
         self._gom_queue: list[dict] = []
+        self._gom_published: list[dict] = []
         self._snapshot_store = SnapshotStore()
         self._run_counter = 0
         self._state_file = Path(state_file) if state_file is not None else None
@@ -484,6 +485,35 @@ class ApiService:
             "artifact": artifact,
         }
 
+    def confirm_gom(self, payload: dict) -> dict:
+        draft_id = payload.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            raise ValueError("draft_id is required")
+
+        published_url = payload.get("published_url")
+        if not isinstance(published_url, str) or not published_url.strip():
+            raise ValueError("published_url is required")
+
+        match_index = None
+        for idx, item in enumerate(self._gom_queue):
+            if item.get("draft_id") == draft_id.strip():
+                match_index = idx
+                break
+
+        if match_index is None:
+            raise ValueError(f"unknown draft id: {draft_id}")
+
+        queued_item = self._gom_queue.pop(match_index)
+        published = {
+            "draft_id": queued_item["draft_id"],
+            "title": queued_item["title"],
+            "published_url": published_url.strip(),
+            "status": "published",
+        }
+        self._gom_published.append(published)
+        self._persist_state()
+        return dict(published)
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
@@ -508,6 +538,11 @@ class ApiService:
             for item in payload.get("gom_queue", [])
             if isinstance(item, dict)
         ]
+        self._gom_published = [
+            dict(item)
+            for item in payload.get("gom_published", [])
+            if isinstance(item, dict)
+        ]
         snapshot_payload = payload.get("snapshots", {})
         if isinstance(snapshot_payload, dict):
             self._snapshot_store.import_records(snapshot_payload)
@@ -522,6 +557,7 @@ class ApiService:
             "runs": self._runs,
             "proposals": self._proposals_by_run,
             "gom_queue": self._gom_queue,
+            "gom_published": self._gom_published,
             "snapshots": self._snapshot_store.export_records(),
         }
         self._state_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
