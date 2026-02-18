@@ -8,6 +8,28 @@
 
 ---
 
+## Purpose
+
+Explain the behavioral model (CODE + PARA) that Mind Lite supports, so product decisions stay aligned with a practical second-brain workflow.
+
+---
+
+## Scope
+
+### In Scope
+
+- Methodology definitions for Capture, Organize, Distill, and Express
+- Workflow intent and user behavior guidance
+- Conceptual mapping from method to Mind Lite feature areas
+
+### Out of Scope
+
+- Final endpoint contract authority
+- Risk policy and threat controls
+- Runtime architecture implementation details
+
+---
+
 ## What Is a Second Brain?
 
 A Second Brain is a digital archive of your most valuable memories, ideas, and knowledge. It serves as an external thinking tool that:
@@ -383,3 +405,11 @@ Mind Lite implements CODE with these features:
 - PARA Method: https://fortelabs.com/blog/para-method/
 - Progressive Summarization: https://fortelabs.com/blog/progressive-summarization-a-practical-technique-for-designing-discoverable-notes/
 - Intermediate Packets: https://fortelabs.com/blog/how-to-create-an-intermediate-packet/
+
+---
+
+## Read Next
+
+1. `FOUNDATION.md` for v1 scope and operating constraints
+2. `API.md` for implementation contract authority
+3. `GOM.md` for publication philosophy and output destination

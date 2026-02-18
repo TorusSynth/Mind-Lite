@@ -8,6 +8,28 @@
 
 ---
 
+## Purpose
+
+Define what GOM is for, what belongs there, and how Mind Lite publishes to it without leaking private or low-quality content.
+
+---
+
+## Scope
+
+### In Scope
+
+- GOM identity, curation philosophy, and publish intent
+- Content eligibility and publish pipeline concepts
+- Relationship boundaries between Mind Lite and GOM
+
+### Out of Scope
+
+- API contract authority for publish endpoints
+- Hosting/deployment automation details for v1
+- Full site platform architecture beyond publishing requirements
+
+---
+
 ## What GOM Is
 
 **GOM is your digital garden** — a curated public space where the fruits of Mind Lite become visible, navigable, and useful to others (and future you).
@@ -309,3 +331,11 @@ GOM succeeds when:
 **GOM is a digital garden where careful thinking becomes visible** — a humane, structured, aesthetic space that documents your growth and releases your work: research, guides, experiments, and art.
 
 It's your personal perspective on reality, cultivated over time, offered as a navigable landscape rather than a feed.
+
+---
+
+## Read Next
+
+1. `FOUNDATION.md` for publish constraints in overall product scope
+2. `API.md` for publication gate and export contracts
+3. `docs/specs/threat-model-v1.md` for privacy and leakage controls

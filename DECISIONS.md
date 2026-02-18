@@ -15,6 +15,22 @@ This document records key architectural decisions and their rationale. Each deci
 
 ---
 
+## Scope
+
+### In Scope
+
+- Major v1 technical decisions and trade-offs
+- Decision rationale and implications for implementation
+- ADR log as the canonical reference for accepted choices
+
+### Out of Scope
+
+- Endpoint contract definitions (see `API.md`)
+- Delivery sequencing (see `ROADMAP.md`)
+- Low-level task implementation details
+
+---
+
 ## ADR-001: FastAPI for API Framework
 
 **Decision:** Use FastAPI as the web framework.
@@ -303,3 +319,11 @@ This document records key architectural decisions and their rationale. Each deci
 | ADR-009 | 2026-02-17 | No auth in v1 | Accepted |
 | ADR-010 | 2026-02-17 | Obsidian plugin as primary GUI | Accepted |
 | ADR-011 | 2026-02-17 | Basic publishing pipeline in v1 | Accepted |
+
+---
+
+## Read Next
+
+1. `ARCHITECTURE.md` for component boundaries that realize these decisions
+2. `ROADMAP.md` for phase ordering and capability gates
+3. `API.md` for contract-level implications

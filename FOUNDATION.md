@@ -19,6 +19,23 @@ It is designed to be:
 
 ---
 
+## Scope
+
+### In Scope
+
+- Product promise and v1 exclusions
+- Hybrid automation and confidence-gate model
+- Obsidian-first, routing, privacy, and publishing contracts
+- Minimum object model and pre-coding requirement
+
+### Out of Scope
+
+- Endpoint request/response details (see `API.md`)
+- Component-level implementation structure (see `ARCHITECTURE.md`)
+- Task-by-task execution planning (see `docs/plans/`)
+
+---
+
 ## Product Promise (V1)
 
 Mind Lite v1 must deliver all of the following:
@@ -166,3 +183,11 @@ Mind Lite v1 is complete when all are true:
 Coding should not start until documentation is approved as human-readable, consistent, and sufficient to predict how Mind Lite will behave in real vault usage.
 
 This requirement is intentional and part of project quality.
+
+---
+
+## Read Next
+
+1. `README.md` for high-level entrypoint and navigation map
+2. `ROADMAP.md` for capability phases and exits
+3. `ARCHITECTURE.md` for component boundaries

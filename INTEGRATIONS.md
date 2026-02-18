@@ -15,6 +15,28 @@
 
 ---
 
+## Purpose
+
+Define v1 external runtime dependencies and the control boundaries around provider routing, fallback, and degradation behavior.
+
+---
+
+## Scope
+
+### In Scope
+
+- LM Studio as default runtime
+- OpenAI fallback constraints and budget guardrails
+- Failure-mode behavior when integrations degrade
+
+### Out of Scope
+
+- Multi-provider orchestration in v1
+- Production cloud deployment architecture
+- Integration marketplace beyond listed future options
+
+---
+
 ## V1 Runtime Integrations
 
 ## 1) LM Studio (Primary Local Runtime)
@@ -71,3 +93,11 @@ Controls:
 - Repeated quality failures trigger auto-safe mode
 
 The system should always remain usable even with integrations partially unavailable.
+
+---
+
+## Read Next
+
+- `ARCHITECTURE.md` for routing and safety engine responsibilities
+- `docs/specs/threat-model-v1.md` for risk controls on provider boundaries
+- `API.md` for policy and routing endpoints
