@@ -783,6 +783,43 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_organize_propose_structure_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        payload = {
+            "notes": [
+                {"note_id": "n1", "title": "Atlas Scratchpad", "folder": "Inbox"},
+                {"note_id": "n2", "title": "Atlas Architecture", "folder": "Projects/Atlas"},
+            ]
+        }
+        conn.request(
+            "POST",
+            "/organize/propose-structure",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(len(body["proposals"]), 2)
+        self.assertEqual(body["proposals"][0]["action_mode"], "manual")
+
+    def test_organize_propose_structure_endpoint_rejects_empty_notes(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/organize/propose-structure",
+            body=json.dumps({"notes": []}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -435,6 +435,29 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.links_apply({"source_note_id": "n1", "links": []})
 
+    def test_organize_propose_structure_returns_manual_suggestions(self):
+        service = ApiService()
+
+        result = service.organize_propose_structure(
+            {
+                "notes": [
+                    {"note_id": "n1", "title": "Atlas Scratchpad", "folder": "Inbox"},
+                    {"note_id": "n2", "title": "Atlas Architecture", "folder": "Projects/Atlas"},
+                ]
+            }
+        )
+
+        self.assertEqual(len(result["proposals"]), 2)
+        self.assertEqual(result["proposals"][0]["note_id"], "n1")
+        self.assertEqual(result["proposals"][0]["action_mode"], "manual")
+        self.assertIn("proposed_folder", result["proposals"][0])
+
+    def test_organize_propose_structure_requires_notes(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.organize_propose_structure({"notes": []})
+
 
 if __name__ == "__main__":
     unittest.main()
