@@ -37,6 +37,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service core implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
+- Run rollback workflow implemented in `src/mind_lite/api/service.py`
 
 ---
 
@@ -47,6 +48,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/proposals`
 - `POST /runs/{run_id}/apply`
+- `POST /runs/{run_id}/rollback`
 
 Run locally with:
 
