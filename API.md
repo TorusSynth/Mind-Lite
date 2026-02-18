@@ -67,6 +67,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Analyze-folder staged run outcomes (`ready_safe_auto`, `awaiting_review`) implemented in `src/mind_lite/api/service.py`
 - Analyze-folders batch onboarding endpoint/service implemented in `src/mind_lite/api/http_server.py` and `src/mind_lite/api/service.py`
 - Analyze-folders parent batch summary counters and aggregate state transitions (`batch_total`, `batch_completed`, `batches`, final `state`) implemented in `src/mind_lite/api/service.py`
+- Batch checkpoint `snapshot_id` tracking in batch entries and `applied_batch_ids` parent tracking implemented in `src/mind_lite/api/service.py`
 - Run lifecycle transition validation for analyze/approve/apply implemented in `src/mind_lite/api/service.py`
 - Run lifecycle contract supports direct `analyzing -> awaiting_review` transition in `src/mind_lite/contracts/run_lifecycle.py`
 - Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
