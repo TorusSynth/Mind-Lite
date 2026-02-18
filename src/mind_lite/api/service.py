@@ -387,6 +387,7 @@ class ApiService:
         }
         if normalized_event_id is not None:
             self._ask_response_by_event[normalized_event_id] = dict(response)
+            self._persist_state()
         return response
 
     def publish_score(self, payload: dict) -> dict:
@@ -724,6 +725,15 @@ class ApiService:
             for item in payload.get("gom_published", [])
             if isinstance(item, dict)
         ]
+        ask_replay_payload = payload.get("ask_replay", {})
+        self._ask_response_by_event = {
+            key: dict(value)
+            for key, value in ask_replay_payload.items()
+            if isinstance(key, str) and isinstance(value, dict)
+        }
+        self._ask_replay_ledger = RunReplayLedger()
+        for event_id in sorted(self._ask_response_by_event.keys()):
+            apply_event(self._ask_replay_ledger, "ask", event_id)
         snapshot_payload = payload.get("snapshots", {})
         if isinstance(snapshot_payload, dict):
             self._snapshot_store.import_records(snapshot_payload)
@@ -739,6 +749,7 @@ class ApiService:
             "proposals": self._proposals_by_run,
             "gom_queue": self._gom_queue,
             "gom_published": self._gom_published,
+            "ask_replay": self._ask_response_by_event,
             "snapshots": self._snapshot_store.export_records(),
         }
         self._state_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
