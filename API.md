@@ -43,6 +43,9 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Sensitivity cloud-eligibility check endpoint implemented in `src/mind_lite/api/service.py`
 - Sensitivity policy summary endpoint implemented in `src/mind_lite/api/service.py`
 - Routing policy summary endpoint implemented in `src/mind_lite/api/service.py`
+- Ask endpoint with policy-gated provider routing implemented in `src/mind_lite/api/service.py`
+- Readiness endpoint implemented in `src/mind_lite/api/service.py`
+- Prometheus-style metrics endpoint implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
@@ -51,6 +54,8 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 ## Runnable Endpoints (Current)
 
 - `GET /health`
+- `GET /health/ready`
+- `GET /metrics`
 - `GET /runs`
 - `GET /policy/sensitivity`
 - `GET /policy/routing`
@@ -61,6 +66,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /runs/{run_id}/apply`
 - `POST /runs/{run_id}/rollback`
 - `POST /policy/sensitivity/check`
+- `POST /ask`
 
 Run locally with:
 
