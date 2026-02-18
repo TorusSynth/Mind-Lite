@@ -1,0 +1,65 @@
+import json
+import tempfile
+import threading
+import time
+import unittest
+from http.client import HTTPConnection
+from pathlib import Path
+
+from mind_lite.api.http_server import create_server
+
+
+class HttpServerTests(unittest.TestCase):
+    def setUp(self):
+        self.server = create_server(host="127.0.0.1", port=0)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        time.sleep(0.01)
+        self.host, self.port = self.server.server_address
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=1)
+
+    def test_health_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request("GET", "/health")
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body, {"status": "ok"})
+
+    def test_analyze_and_get_run_endpoints(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            analyzed = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(resp.status, 200)
+
+            run_id = analyzed["run_id"]
+            conn.request("GET", f"/runs/{run_id}")
+            run_resp = conn.getresponse()
+            run_body = json.loads(run_resp.read().decode("utf-8"))
+            conn.close()
+
+            self.assertEqual(run_resp.status, 200)
+            self.assertEqual(run_body["run_id"], run_id)
+            self.assertEqual(run_body["profile"]["note_count"], 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
