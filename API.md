@@ -30,6 +30,8 @@ Implementation has not started. This is the contract to build against.
 - Contract tests implemented in `tests/contracts/test_snapshot_rollback_policy.py`
 - Provider routing fallback contract implemented in `src/mind_lite/contracts/provider_routing.py`
 - Contract tests implemented in `tests/contracts/test_provider_routing_policy.py`
+- Idempotency replay contract implemented in `src/mind_lite/contracts/idempotency_replay.py`
+- Contract tests implemented in `tests/contracts/test_idempotency_replay_policy.py`
 
 ---
 
