@@ -52,6 +52,11 @@ class ApiServiceTests(unittest.TestCase):
             self.assertIn("snapshot_id", apply_result)
             self.assertGreaterEqual(apply_result["applied_count"], 1)
 
+            rollback_result = service.rollback_run(run_id, {"snapshot_id": apply_result["snapshot_id"]})
+            self.assertEqual(rollback_result["run_id"], run_id)
+            self.assertEqual(rollback_result["state"], "rolled_back")
+            self.assertEqual(rollback_result["rolled_back_snapshot_id"], apply_result["snapshot_id"])
+
 
 if __name__ == "__main__":
     unittest.main()

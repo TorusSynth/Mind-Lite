@@ -101,6 +101,22 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(applied["state"], "applied")
             self.assertIn("snapshot_id", applied)
 
+            rollback_payload = {"snapshot_id": applied["snapshot_id"]}
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            conn.request(
+                "POST",
+                f"/runs/{run_id}/rollback",
+                body=json.dumps(rollback_payload),
+                headers={"Content-Type": "application/json"},
+            )
+            rollback_resp = conn.getresponse()
+            rollback_body = json.loads(rollback_resp.read().decode("utf-8"))
+            conn.close()
+
+            self.assertEqual(rollback_resp.status, 200)
+            self.assertEqual(rollback_body["run_id"], run_id)
+            self.assertEqual(rollback_body["state"], "rolled_back")
+
 
 if __name__ == "__main__":
     unittest.main()
