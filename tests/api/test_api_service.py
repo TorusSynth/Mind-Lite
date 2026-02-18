@@ -32,6 +32,26 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.analyze_folder({"folder_path": "/tmp/does-not-exist-ml", "mode": "analyze"})
 
+    def test_proposals_list_and_apply_flow(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            run = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            run_id = run["run_id"]
+
+            listed = service.get_run_proposals(run_id)
+            self.assertEqual(listed["run_id"], run_id)
+            self.assertGreaterEqual(len(listed["proposals"]), 1)
+
+            apply_result = service.apply_run(run_id, {"change_types": ["tag_enrichment"]})
+            self.assertEqual(apply_result["run_id"], run_id)
+            self.assertEqual(apply_result["state"], "applied")
+            self.assertIn("snapshot_id", apply_result)
+            self.assertGreaterEqual(apply_result["applied_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

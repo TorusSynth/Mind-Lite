@@ -60,6 +60,47 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(run_body["run_id"], run_id)
             self.assertEqual(run_body["profile"]["note_count"], 2)
 
+    def test_proposals_and_apply_endpoints(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            analyzed_resp = conn.getresponse()
+            analyzed = json.loads(analyzed_resp.read().decode("utf-8"))
+            self.assertEqual(analyzed_resp.status, 200)
+            run_id = analyzed["run_id"]
+
+            conn.request("GET", f"/runs/{run_id}/proposals")
+            list_resp = conn.getresponse()
+            listed = json.loads(list_resp.read().decode("utf-8"))
+            self.assertEqual(list_resp.status, 200)
+            self.assertEqual(listed["run_id"], run_id)
+
+            apply_payload = {"change_types": ["tag_enrichment"]}
+            conn.request(
+                "POST",
+                f"/runs/{run_id}/apply",
+                body=json.dumps(apply_payload),
+                headers={"Content-Type": "application/json"},
+            )
+            apply_resp = conn.getresponse()
+            applied = json.loads(apply_resp.read().decode("utf-8"))
+            conn.close()
+
+            self.assertEqual(apply_resp.status, 200)
+            self.assertEqual(applied["run_id"], run_id)
+            self.assertEqual(applied["state"], "applied")
+            self.assertIn("snapshot_id", applied)
+
 
 if __name__ == "__main__":
     unittest.main()
