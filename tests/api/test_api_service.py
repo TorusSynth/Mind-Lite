@@ -225,6 +225,29 @@ class ApiServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.publish_prepare({"draft_id": "draft_004", "content": "text"})
 
+    def test_mark_for_gom_enqueues_publish_candidate(self):
+        service = ApiService()
+
+        marked = service.mark_for_gom(
+            {
+                "draft_id": "draft_010",
+                "title": "Project Atlas Weekly",
+                "prepared_content": "Ready for export.",
+            }
+        )
+        queue = service.list_gom_queue()
+
+        self.assertEqual(marked["draft_id"], "draft_010")
+        self.assertEqual(marked["status"], "queued_for_gom")
+        self.assertEqual(queue["count"], 1)
+        self.assertEqual(queue["items"][0]["draft_id"], "draft_010")
+
+    def test_mark_for_gom_requires_required_fields(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.mark_for_gom({"draft_id": "draft_011", "title": "Missing content"})
+
 
 if __name__ == "__main__":
     unittest.main()

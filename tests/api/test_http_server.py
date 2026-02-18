@@ -386,6 +386,49 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_mark_for_gom_and_queue_endpoints(self):
+        payload = {
+            "draft_id": "draft_010",
+            "title": "Project Atlas Weekly",
+            "prepared_content": "Ready for export.",
+        }
+
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp = conn.getresponse()
+        mark_body = json.loads(mark_resp.read().decode("utf-8"))
+        self.assertEqual(mark_resp.status, 200)
+        self.assertEqual(mark_body["status"], "queued_for_gom")
+
+        conn.request("GET", "/publish/gom-queue")
+        queue_resp = conn.getresponse()
+        queue_body = json.loads(queue_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(queue_resp.status, 200)
+        self.assertEqual(queue_body["count"], 1)
+        self.assertEqual(queue_body["items"][0]["draft_id"], "draft_010")
+
+    def test_mark_for_gom_requires_prepared_content(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps({"draft_id": "draft_010", "title": "No content"}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()
