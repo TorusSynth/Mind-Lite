@@ -521,6 +521,37 @@ class ApiService:
             "items": items,
         }
 
+    def organize_classify(self, payload: dict) -> dict:
+        notes = payload.get("notes")
+        if not isinstance(notes, list) or not notes:
+            raise ValueError("notes must be a non-empty list")
+
+        results = []
+        for note in notes:
+            if not isinstance(note, dict):
+                raise ValueError("each note must be an object")
+
+            note_id = note.get("note_id")
+            title = note.get("title")
+            if not isinstance(note_id, str) or not note_id.strip():
+                raise ValueError("note_id is required")
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError("title is required")
+
+            primary, confidence = self._classify_para(title)
+            action_mode = decide_action_mode("low", confidence).value
+            results.append(
+                {
+                    "note_id": note_id.strip(),
+                    "primary_para": primary,
+                    "secondary_para": [],
+                    "confidence": confidence,
+                    "action_mode": action_mode,
+                }
+            )
+
+        return {"results": results}
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
@@ -587,3 +618,13 @@ class ApiService:
                 }
             )
         return proposals
+
+    def _classify_para(self, title: str) -> tuple[str, float]:
+        lowered = title.lower()
+        if "project" in lowered:
+            return "project", 0.86
+        if "area" in lowered:
+            return "area", 0.83
+        if "archive" in lowered:
+            return "archive", 0.81
+        return "resource", 0.79
