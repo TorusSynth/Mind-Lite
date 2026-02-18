@@ -34,6 +34,8 @@ class ApiService:
         self._ask_response_by_event: dict[str, dict] = {}
         self._links_apply_replay_ledger = RunReplayLedger()
         self._links_apply_response_by_event: dict[str, dict] = {}
+        self._publish_mark_replay_ledger = RunReplayLedger()
+        self._publish_mark_response_by_event: dict[str, dict] = {}
         self._load_state_if_present()
 
     def health(self) -> dict:
@@ -472,6 +474,25 @@ class ApiService:
         }
 
     def mark_for_gom(self, payload: dict) -> dict:
+        event_id = payload.get("event_id")
+        if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
+            raise ValueError("event_id must be a non-empty string")
+        normalized_event_id = event_id.strip() if isinstance(event_id, str) else None
+
+        if normalized_event_id is not None:
+            replay = apply_event(self._publish_mark_replay_ledger, "publish_mark", normalized_event_id)
+            if replay.duplicate:
+                cached = self._publish_mark_response_by_event.get(normalized_event_id)
+                if cached is None:
+                    raise ValueError("missing replay cache for duplicate event")
+                duplicated = dict(cached)
+                duplicated["idempotency"] = {
+                    "event_id": normalized_event_id,
+                    "duplicate": True,
+                    "reason": replay.reason,
+                }
+                return duplicated
+
         draft_id = payload.get("draft_id")
         if not isinstance(draft_id, str) or not draft_id.strip():
             raise ValueError("draft_id is required")
@@ -484,13 +505,20 @@ class ApiService:
         if not isinstance(prepared_content, str) or not prepared_content.strip():
             raise ValueError("prepared_content is required")
 
-        item = {
+        item: dict[str, object] = {
             "draft_id": draft_id.strip(),
             "title": title.strip(),
             "prepared_content": prepared_content.strip(),
             "status": "queued_for_gom",
         }
+        item["idempotency"] = {
+            "event_id": normalized_event_id,
+            "duplicate": False,
+            "reason": "accepted" if normalized_event_id is not None else "not_provided",
+        }
         self._gom_queue.append(item)
+        if normalized_event_id is not None:
+            self._publish_mark_response_by_event[normalized_event_id] = dict(item)
         self._persist_state()
         return dict(item)
 
@@ -796,6 +824,15 @@ class ApiService:
         self._links_apply_replay_ledger = RunReplayLedger()
         for event_id in sorted(self._links_apply_response_by_event.keys()):
             apply_event(self._links_apply_replay_ledger, "links_apply", event_id)
+        publish_mark_replay_payload = payload.get("publish_mark_replay", {})
+        self._publish_mark_response_by_event = {
+            key: dict(value)
+            for key, value in publish_mark_replay_payload.items()
+            if isinstance(key, str) and isinstance(value, dict)
+        }
+        self._publish_mark_replay_ledger = RunReplayLedger()
+        for event_id in sorted(self._publish_mark_response_by_event.keys()):
+            apply_event(self._publish_mark_replay_ledger, "publish_mark", event_id)
         snapshot_payload = payload.get("snapshots", {})
         if isinstance(snapshot_payload, dict):
             self._snapshot_store.import_records(snapshot_payload)
@@ -813,6 +850,7 @@ class ApiService:
             "gom_published": self._gom_published,
             "ask_replay": self._ask_response_by_event,
             "links_apply_replay": self._links_apply_response_by_event,
+            "publish_mark_replay": self._publish_mark_response_by_event,
             "snapshots": self._snapshot_store.export_records(),
         }
         self._state_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
