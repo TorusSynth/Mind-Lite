@@ -39,6 +39,7 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 - Coverage added in `tests/contracts/test_rollback_validation_policy.py`
 - Runnable HTTP API bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service state with optional file persistence implemented in `src/mind_lite/api/service.py`
+- Publish export-for-gom idempotency replay and persistence implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
