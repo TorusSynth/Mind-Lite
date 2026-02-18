@@ -179,6 +179,30 @@ class ApiServiceTests(unittest.TestCase):
         self.assertFalse(result["provider_trace"]["fallback_used"])
         self.assertEqual(result["provider_trace"]["fallback_reason"], "cloud_blocked")
 
+    def test_publish_score_returns_gate_pass_for_strong_draft(self):
+        service = ApiService()
+
+        result = service.publish_score(
+            {
+                "draft_id": "draft_001",
+                "content": "This is a clear project update with concrete outcomes and next steps." * 4,
+            }
+        )
+
+        self.assertEqual(result["draft_id"], "draft_001")
+        self.assertIn("scores", result)
+        self.assertIn("overall", result["scores"])
+        self.assertTrue(result["gate_passed"])
+
+    def test_publish_score_blocks_weak_draft(self):
+        service = ApiService()
+
+        result = service.publish_score({"draft_id": "draft_002", "content": "TODO"})
+
+        self.assertEqual(result["draft_id"], "draft_002")
+        self.assertFalse(result["gate_passed"])
+        self.assertLess(result["scores"]["overall"], 0.8)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -309,6 +309,42 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_publish_score_endpoint(self):
+        payload = {
+            "draft_id": "draft_001",
+            "content": "This is a clear project update with concrete outcomes and next steps." * 4,
+        }
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/score",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["draft_id"], "draft_001")
+        self.assertIn("scores", body)
+        self.assertTrue(body["gate_passed"])
+
+    def test_publish_score_endpoint_requires_draft_id_and_content(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/score",
+            body=json.dumps({"draft_id": "draft_001"}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()
