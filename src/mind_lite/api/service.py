@@ -4,6 +4,7 @@ from pathlib import Path
 
 from mind_lite.contracts.action_tiering import decide_action_mode
 from mind_lite.contracts.budget_guardrails import evaluate_budget
+from mind_lite.contracts.idempotency_replay import RunReplayLedger, apply_event
 from mind_lite.contracts.provider_routing import select_provider, RoutingInput
 from mind_lite.contracts.sensitivity_gate import (
     PROTECTED_PATH_PREFIXES,
@@ -29,6 +30,8 @@ class ApiService:
         self._monthly_budget_cap = 30.0
         self._monthly_spend = 0.0
         self._local_confidence_threshold = 0.70
+        self._ask_replay_ledger = RunReplayLedger()
+        self._ask_response_by_event: dict[str, dict] = {}
         self._load_state_if_present()
 
     def health(self) -> dict:
@@ -283,6 +286,25 @@ class ApiService:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query is required")
 
+        event_id = payload.get("event_id")
+        if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
+            raise ValueError("event_id must be a non-empty string")
+        normalized_event_id = event_id.strip() if isinstance(event_id, str) else None
+
+        if normalized_event_id is not None:
+            replay = apply_event(self._ask_replay_ledger, "ask", normalized_event_id)
+            if replay.duplicate:
+                cached = self._ask_response_by_event.get(normalized_event_id)
+                if cached is None:
+                    raise ValueError("missing replay cache for duplicate event")
+                duplicated = dict(cached)
+                duplicated["idempotency"] = {
+                    "event_id": normalized_event_id,
+                    "duplicate": True,
+                    "reason": replay.reason,
+                }
+                return duplicated
+
         allow_fallback = payload.get("allow_fallback", True)
         if not isinstance(allow_fallback, bool):
             raise ValueError("allow_fallback must be a boolean")
@@ -335,7 +357,7 @@ class ApiService:
             )
         )
 
-        return {
+        response = {
             "answer": {
                 "text": f"Draft answer for: {query.strip()}",
                 "confidence": local_confidence,
@@ -357,6 +379,15 @@ class ApiService:
                 "local_only_mode": budget_decision.local_only_mode,
             },
         }
+
+        response["idempotency"] = {
+            "event_id": normalized_event_id,
+            "duplicate": False,
+            "reason": "accepted" if normalized_event_id is not None else "not_provided",
+        }
+        if normalized_event_id is not None:
+            self._ask_response_by_event[normalized_event_id] = dict(response)
+        return response
 
     def publish_score(self, payload: dict) -> dict:
         draft_id = payload.get("draft_id")
