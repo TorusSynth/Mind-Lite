@@ -305,6 +305,28 @@ class ApiServiceTests(unittest.TestCase):
                 }
             )
 
+    def test_list_published_returns_confirmed_items(self):
+        service = ApiService()
+        service.mark_for_gom(
+            {
+                "draft_id": "draft_040",
+                "title": "Atlas Journal",
+                "prepared_content": "Ready.",
+            }
+        )
+        service.confirm_gom(
+            {
+                "draft_id": "draft_040",
+                "published_url": "https://gom.example/posts/atlas-journal",
+            }
+        )
+
+        result = service.list_published()
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["items"][0]["draft_id"], "draft_040")
+        self.assertEqual(result["items"][0]["status"], "published")
+
 
 if __name__ == "__main__":
     unittest.main()

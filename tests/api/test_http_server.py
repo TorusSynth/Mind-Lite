@@ -536,6 +536,46 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(resp.status, 400)
         self.assertIn("error", body)
 
+    def test_published_list_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        mark_payload = {
+            "draft_id": "draft_040",
+            "title": "Atlas Journal",
+            "prepared_content": "Ready.",
+        }
+        conn.request(
+            "POST",
+            "/publish/mark-for-gom",
+            body=json.dumps(mark_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp = conn.getresponse()
+        self.assertEqual(mark_resp.status, 200)
+        mark_resp.read()
+
+        confirm_payload = {
+            "draft_id": "draft_040",
+            "published_url": "https://gom.example/posts/atlas-journal",
+        }
+        conn.request(
+            "POST",
+            "/publish/confirm-gom",
+            body=json.dumps(confirm_payload),
+            headers={"Content-Type": "application/json"},
+        )
+        confirm_resp = conn.getresponse()
+        self.assertEqual(confirm_resp.status, 200)
+        confirm_resp.read()
+
+        conn.request("GET", "/publish/published")
+        list_resp = conn.getresponse()
+        list_body = json.loads(list_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(list_resp.status, 200)
+        self.assertEqual(list_body["count"], 1)
+        self.assertEqual(list_body["items"][0]["draft_id"], "draft_040")
+
 
 if __name__ == "__main__":
     unittest.main()
