@@ -168,6 +168,32 @@ class ApiServiceTests(unittest.TestCase):
             self.assertTrue(replayed["idempotency"]["duplicate"])
             self.assertEqual(replayed["answer"]["text"], first["answer"]["text"])
 
+    def test_persists_links_apply_idempotency_replay_cache_to_state_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            first = service.links_apply(
+                {
+                    "source_note_id": "n1",
+                    "links": [{"target_note_id": "n2", "confidence": 0.9}],
+                    "event_id": "evt_links_001",
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            replayed = reloaded.links_apply(
+                {
+                    "source_note_id": "n1",
+                    "links": [{"target_note_id": "n3", "confidence": 0.1}],
+                    "event_id": "evt_links_001",
+                }
+            )
+
+            self.assertTrue(replayed["idempotency"]["duplicate"])
+            self.assertEqual(replayed["applied_links"], first["applied_links"])
+
     def test_sensitivity_check_blocks_payload_with_secret_pattern(self):
         service = ApiService()
 
