@@ -390,6 +390,28 @@ class ApiService:
             "gate_passed": overall >= 0.80,
         }
 
+    def publish_prepare(self, payload: dict) -> dict:
+        draft_id = payload.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            raise ValueError("draft_id is required")
+
+        content = payload.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("content is required")
+
+        target = payload.get("target")
+        if not isinstance(target, str) or not target.strip():
+            raise ValueError("target is required")
+
+        prepared_content = content.strip().replace("\r\n", "\n")
+
+        return {
+            "draft_id": draft_id.strip(),
+            "target": target.strip(),
+            "prepared_content": prepared_content,
+            "sanitized": True,
+        }
+
     def _next_run_id(self) -> str:
         self._run_counter += 1
         return f"run_{self._run_counter:04d}"
