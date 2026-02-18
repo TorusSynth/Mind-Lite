@@ -1,6 +1,6 @@
 # Mind Lite - API Specification v2.0 (Planning)
 
-**Status:** Initial Implementation In Progress  
+**Status:** Implementation Active  
 **Last Updated:** 2026-02-18  
 **Base URL (target):** `http://localhost:8000`
 
@@ -64,6 +64,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Onboarding LLM proposal parser tests implemented in `tests/onboarding/test_proposal_llm.py`
 - Analyze-folder note-candidate proposal integration implemented in `src/mind_lite/api/service.py`
 - Analyze-folder partial/all-failure diagnostics and `failed_needs_attention` handling implemented in `src/mind_lite/api/service.py`
+- Analyze-folder staged run outcomes (`ready_safe_auto`, `awaiting_review`) implemented in `src/mind_lite/api/service.py`
+- Run lifecycle transition validation for analyze/approve/apply implemented in `src/mind_lite/api/service.py`
+- Run lifecycle contract supports direct `analyzing -> awaiting_review` transition in `src/mind_lite/contracts/run_lifecycle.py`
+- Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
 - Ask endpoint idempotency replay behavior implemented in `src/mind_lite/api/service.py`
 - Ask idempotency replay cache persistence implemented in `src/mind_lite/api/service.py`
 - Links apply endpoint idempotency replay behavior implemented in `src/mind_lite/api/service.py`
@@ -139,7 +143,7 @@ Persist state across restarts with:
 - Batch-safe operations with rollback support
 - Obsidian compatibility preservation
 
-Terminology alignment:
+Terminology contract:
 
 - **Hybrid automation** uses risk-tiered action modes (`auto`, `suggest`, `manual`)
 - **Cloud fallback gate** allows non-local provider use only when triggers pass policy

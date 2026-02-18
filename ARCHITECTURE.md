@@ -1,6 +1,6 @@
 # Mind Lite - Technical Architecture v2.0
 
-**Status:** Active Design  
+**Status:** Implementation Active  
 **Last Updated:** 2026-02-18
 
 ---
@@ -19,39 +19,16 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 
 ## Implementation Status (Phases A-B)
 
-Detailed endpoint-level status is recorded in `API.md`; this section tracks architecture-relevant milestones.
+Canonical endpoint-level implementation status is maintained in `API.md`.
 
-- Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
-- Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
-- Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
-- Coverage added in `tests/onboarding/test_analyze_readonly.py`
-- Onboarding note-level profile extraction implemented in `src/mind_lite/onboarding/analyze_readonly.py`
-- Coverage added in `tests/onboarding/test_analyze_readonly.py`
-- Run lifecycle transition contract implemented in `src/mind_lite/contracts/run_lifecycle.py`
-- Coverage added in `tests/contracts/test_run_lifecycle_policy.py`
-- Sensitivity gate cloud-eligibility contract implemented in `src/mind_lite/contracts/sensitivity_gate.py`
-- Coverage added in `tests/contracts/test_sensitivity_gate_policy.py`
-- Budget guardrails contract implemented in `src/mind_lite/contracts/budget_guardrails.py`
-- Coverage added in `tests/contracts/test_budget_guardrails_policy.py`
-- Snapshot rollback contract implemented in `src/mind_lite/contracts/snapshot_rollback.py`
-- Coverage added in `tests/contracts/test_snapshot_rollback_policy.py`
-- Provider routing fallback contract implemented in `src/mind_lite/contracts/provider_routing.py`
-- Coverage added in `tests/contracts/test_provider_routing_policy.py`
-- Idempotency replay contract implemented in `src/mind_lite/contracts/idempotency_replay.py`
-- Coverage added in `tests/contracts/test_idempotency_replay_policy.py`
-- Rollback validation invariants contract implemented in `src/mind_lite/contracts/rollback_validation.py`
-- Coverage added in `tests/contracts/test_rollback_validation_policy.py`
-- Runnable HTTP API bootstrap implemented in `src/mind_lite/api/http_server.py`
-- API service state with optional file persistence implemented in `src/mind_lite/api/service.py`
-- Publish export-for-gom idempotency replay and persistence implemented in `src/mind_lite/api/service.py`
-- Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
-- Onboarding LLM proposal normalization implemented in `src/mind_lite/onboarding/proposal_llm.py`
-- Coverage added in `tests/onboarding/test_proposal_llm.py`
-- Analyze-folder note-candidate proposal generation implemented in `src/mind_lite/api/service.py`
-- Analyze-folder diagnostics and all-fail transition to `failed_needs_attention` implemented in `src/mind_lite/api/service.py`
-- Run rollback workflow implemented in `src/mind_lite/api/service.py`
-- Run history listing implemented in `src/mind_lite/api/service.py`
-- HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
+Architecture-level milestones completed:
+
+- Core policy contracts implemented and covered (action tiering, lifecycle, routing, budget, rollback, idempotency)
+- Runnable HTTP API with file-backed state persistence implemented
+- Onboarding read-only analysis extended with note-level profiles and LLM proposal normalization
+- Onboarding staged run outcomes implemented (`ready_safe_auto`, `awaiting_review`, `failed_needs_attention`)
+- Lifecycle-validated state transitions enforced for analyze/approve/apply paths
+- Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
 
 ---
 
