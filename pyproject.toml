@@ -1,0 +1,15 @@
+[project]
+name = "mind-lite"
+version = "0.1.0"
+description = "Mind Lite local-first second brain engine"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
