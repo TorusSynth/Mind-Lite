@@ -9,12 +9,25 @@ def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPSer
 
     class MindLiteHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
-            if self.path == "/health":
+            path = self.path.split("?", 1)[0]
+
+            if path == "/health":
                 self._write_json(200, service.health())
                 return
 
-            if self.path.startswith("/runs/"):
-                run_id = self.path.removeprefix("/runs/")
+            run_route = self._parse_run_route(path)
+            if run_route is not None and run_route[1] == "proposals":
+                run_id = run_route[0]
+                try:
+                    proposals = service.get_run_proposals(run_id)
+                except ValueError as exc:
+                    self._write_json(404, {"error": str(exc)})
+                    return
+                self._write_json(200, proposals)
+                return
+
+            if run_route is not None and run_route[1] is None:
+                run_id = run_route[0]
                 try:
                     run = service.get_run(run_id)
                 except ValueError as exc:
@@ -26,22 +39,44 @@ def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPSer
             self._write_json(404, {"error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
-            if self.path != "/onboarding/analyze-folder":
-                self._write_json(404, {"error": "not found"})
-                return
-
+            path = self.path.split("?", 1)[0]
             body = self._read_json_body()
             if body is None:
                 self._write_json(400, {"error": "invalid json"})
                 return
 
-            try:
-                result = service.analyze_folder(body)
-            except ValueError as exc:
-                self._write_json(400, {"error": str(exc)})
+            if path == "/onboarding/analyze-folder":
+                try:
+                    result = service.analyze_folder(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+
+                self._write_json(200, result)
                 return
 
-            self._write_json(200, result)
+            run_route = self._parse_run_route(path)
+            if run_route is not None and run_route[1] == "apply":
+                run_id = run_route[0]
+                try:
+                    result = service.apply_run(run_id, body)
+                except ValueError as exc:
+                    error_message = str(exc)
+                    status = 404 if "unknown run id" in error_message else 400
+                    self._write_json(status, {"error": error_message})
+                    return
+                self._write_json(200, result)
+                return
+
+            self._write_json(404, {"error": "not found"})
+
+        def _parse_run_route(self, path: str) -> tuple[str, str | None] | None:
+            parts = path.split("/")
+            if len(parts) == 3 and parts[1] == "runs" and parts[2]:
+                return parts[2], None
+            if len(parts) == 4 and parts[1] == "runs" and parts[2] and parts[3]:
+                return parts[2], parts[3]
+            return None
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003
             return
