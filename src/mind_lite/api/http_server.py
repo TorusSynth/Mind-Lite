@@ -27,7 +27,13 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 return
 
             if path == "/runs":
-                self._write_json(200, service.list_runs())
+                filters = self._extract_run_filters(query)
+                try:
+                    runs = service.list_runs(filters)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, runs)
                 return
 
             if path == "/policy/sensitivity":
@@ -242,6 +248,13 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 if not values:
                     continue
                 filters[key] = values[-1]
+            return filters
+
+        def _extract_run_filters(self, query: dict[str, list[str]]) -> dict:
+            filters = {}
+            values = query.get("state")
+            if values:
+                filters["state"] = values[-1]
             return filters
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003

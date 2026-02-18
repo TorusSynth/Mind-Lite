@@ -94,8 +94,20 @@ class ApiService:
             raise ValueError(f"unknown run id: {run_id}")
         return dict(self._runs[run_id])
 
-    def list_runs(self) -> dict:
+    def list_runs(self, filters: dict | None = None) -> dict:
+        if filters is not None and not isinstance(filters, dict):
+            raise ValueError("filters must be an object")
+
+        active_state = None
+        if filters is not None and "state" in filters:
+            state_value = filters.get("state")
+            if not isinstance(state_value, str) or not state_value:
+                raise ValueError("state filter must be a non-empty string")
+            active_state = state_value
+
         ordered = [dict(self._runs[run_id]) for run_id in sorted(self._runs.keys())]
+        if active_state is not None:
+            ordered = [run for run in ordered if run.get("state") == active_state]
         return {"runs": ordered}
 
     def get_run_proposals(self, run_id: str, filters: dict | None = None) -> dict:
