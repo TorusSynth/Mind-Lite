@@ -133,6 +133,21 @@ class ApiServiceTests(unittest.TestCase):
             listed_ids = [item["run_id"] for item in listed["runs"]]
             self.assertEqual(listed_ids, [first["run_id"], second["run_id"]])
 
+    def test_list_runs_supports_state_filter(self):
+        service = ApiService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            first = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            second = service.analyze_folder({"folder_path": str(root), "mode": "analyze"})
+            service.apply_run(second["run_id"], {"change_types": ["tag_enrichment"]})
+
+            filtered = service.list_runs({"state": "applied"})
+            self.assertEqual(len(filtered["runs"]), 1)
+            self.assertEqual(filtered["runs"][0]["run_id"], second["run_id"])
+
     def test_persists_runs_and_snapshots_to_state_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

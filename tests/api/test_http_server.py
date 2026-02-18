@@ -137,6 +137,54 @@ class HttpServerTests(unittest.TestCase):
             self.assertEqual(runs_resp.status, 200)
             self.assertEqual(len(runs_body["runs"]), 1)
 
+    def test_runs_history_endpoint_supports_state_filter(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("[[b]]", encoding="utf-8")
+            (root / "b.md").write_text("No links", encoding="utf-8")
+
+            conn = HTTPConnection(self.host, self.port, timeout=2)
+            payload = {"folder_path": str(root), "mode": "analyze"}
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            first_resp = conn.getresponse()
+            first_run = json.loads(first_resp.read().decode("utf-8"))
+            self.assertEqual(first_resp.status, 200)
+
+            conn.request(
+                "POST",
+                "/onboarding/analyze-folder",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            )
+            second_resp = conn.getresponse()
+            second_run = json.loads(second_resp.read().decode("utf-8"))
+            self.assertEqual(second_resp.status, 200)
+
+            conn.request(
+                "POST",
+                f"/runs/{second_run['run_id']}/apply",
+                body=json.dumps({"change_types": ["tag_enrichment"]}),
+                headers={"Content-Type": "application/json"},
+            )
+            apply_resp = conn.getresponse()
+            self.assertEqual(apply_resp.status, 200)
+            apply_resp.read()
+
+            conn.request("GET", "/runs?state=applied")
+            filtered_resp = conn.getresponse()
+            filtered_body = json.loads(filtered_resp.read().decode("utf-8"))
+            conn.close()
+
+            self.assertEqual(filtered_resp.status, 200)
+            self.assertEqual(len(filtered_body["runs"]), 1)
+            self.assertEqual(filtered_body["runs"][0]["run_id"], second_run["run_id"])
+            self.assertNotEqual(filtered_body["runs"][0]["run_id"], first_run["run_id"])
+
     def test_analyze_and_get_run_endpoints(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
