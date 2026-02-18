@@ -37,6 +37,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Runnable HTTP bootstrap implemented in `src/mind_lite/api/http_server.py`
 - API service core implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
+- Run proposal query filters (`risk_tier`, `action_mode`, `status`) implemented in `src/mind_lite/api/service.py`
 - Run proposal approval workflow implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
 - Run history listing implemented in `src/mind_lite/api/service.py`
