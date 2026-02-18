@@ -668,6 +668,44 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(list_body["count"], 1)
         self.assertEqual(list_body["items"][0]["draft_id"], "draft_040")
 
+    def test_organize_classify_endpoint(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        payload = {
+            "notes": [
+                {"note_id": "n1", "title": "Project Atlas Weekly Plan"},
+                {"note_id": "n2", "title": "Reference Notes: Zettelkasten"},
+            ]
+        }
+        conn.request(
+            "POST",
+            "/organize/classify",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(len(body["results"]), 2)
+        self.assertEqual(body["results"][0]["primary_para"], "project")
+        self.assertEqual(body["results"][1]["primary_para"], "resource")
+
+    def test_organize_classify_endpoint_rejects_invalid_payload(self):
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/organize/classify",
+            body=json.dumps({"notes": [{"note_id": "n1"}]}),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()

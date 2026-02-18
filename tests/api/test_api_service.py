@@ -363,6 +363,30 @@ class ApiServiceTests(unittest.TestCase):
         self.assertEqual(result["items"][0]["draft_id"], "draft_040")
         self.assertEqual(result["items"][0]["status"], "published")
 
+    def test_organize_classify_returns_para_labels(self):
+        service = ApiService()
+
+        result = service.organize_classify(
+            {
+                "notes": [
+                    {"note_id": "n1", "title": "Project Atlas Weekly Plan"},
+                    {"note_id": "n2", "title": "Reference Notes: Zettelkasten"},
+                ]
+            }
+        )
+
+        self.assertEqual(len(result["results"]), 2)
+        self.assertEqual(result["results"][0]["note_id"], "n1")
+        self.assertEqual(result["results"][0]["primary_para"], "project")
+        self.assertEqual(result["results"][1]["note_id"], "n2")
+        self.assertEqual(result["results"][1]["primary_para"], "resource")
+
+    def test_organize_classify_requires_note_id_and_title(self):
+        service = ApiService()
+
+        with self.assertRaises(ValueError):
+            service.organize_classify({"notes": [{"note_id": "n1"}]})
+
 
 if __name__ == "__main__":
     unittest.main()
