@@ -50,6 +50,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Publish scoring endpoint implemented in `src/mind_lite/api/service.py`
 - Publish queue enqueue endpoint implemented in `src/mind_lite/api/service.py`
 - Publish queue listing endpoint implemented in `src/mind_lite/api/service.py`
+- Publish export endpoint implemented in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
 
@@ -75,6 +76,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /publish/prepare`
 - `POST /publish/score`
 - `POST /publish/mark-for-gom`
+- `POST /publish/export-for-gom`
 
 Run locally with:
 
