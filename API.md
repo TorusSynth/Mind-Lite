@@ -18,6 +18,8 @@ Implementation has not started. This is the contract to build against.
 
 - Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
 - Contract tests implemented in `tests/contracts/test_action_tiering_policy.py`
+- Read-only onboarding analysis contract implemented in `src/mind_lite/onboarding/analyze_readonly.py`
+- Contract tests implemented in `tests/onboarding/test_analyze_readonly.py`
 
 ---
 
