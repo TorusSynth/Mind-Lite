@@ -38,12 +38,15 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - API service core implemented in `src/mind_lite/api/service.py`
 - Run proposal listing and apply workflow implemented in `src/mind_lite/api/service.py`
 - Run rollback workflow implemented in `src/mind_lite/api/service.py`
+- Run history listing implemented in `src/mind_lite/api/service.py`
+- Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 
 ---
 
 ## Runnable Endpoints (Current)
 
 - `GET /health`
+- `GET /runs`
 - `POST /onboarding/analyze-folder`
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/proposals`
