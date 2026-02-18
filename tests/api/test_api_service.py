@@ -264,7 +264,7 @@ class ApiServiceTests(unittest.TestCase):
         second = parent["batches"][1]
         self.assertEqual(
             set(first.keys()),
-            {"batch_id", "folder_path", "run_id", "state", "proposal_count", "diagnostics_count"},
+            {"batch_id", "folder_path", "run_id", "state", "proposal_count", "diagnostics_count", "snapshot_id"},
         )
         self.assertEqual(first["batch_id"], "batch_0001")
         self.assertEqual(first["folder_path"], str(folder_one))
@@ -1482,6 +1482,219 @@ class ApiServiceTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             service.organize_propose_structure({"notes": []})
+
+    def test_batch_entry_has_snapshot_id_field_initially_null(self):
+        service = ApiService()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "one"
+            folder_two = root / "two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                if folder_path == str(folder_one):
+                    return {
+                        "run_id": "run_3001",
+                        "state": "ready_safe_auto",
+                        "profile": {"note_count": 1},
+                        "diagnostics": [],
+                    }
+                if folder_path == str(folder_two):
+                    return {
+                        "run_id": "run_3002",
+                        "state": "awaiting_review",
+                        "profile": {"note_count": 2},
+                        "diagnostics": [],
+                    }
+                raise AssertionError(f"unexpected folder path: {folder_path}")
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(folder_one), str(folder_two)],
+                        "mode": "analyze",
+                    }
+                )
+
+        self.assertEqual(len(parent["batches"]), 2)
+        for batch in parent["batches"]:
+            self.assertIn("snapshot_id", batch)
+            self.assertIsNone(batch["snapshot_id"])
+
+    def test_batch_checkpoint_updated_after_child_apply(self):
+        service = ApiService()
+        service._proposals_by_run["run_4001"] = [
+            {"proposal_id": "run_4001-prop-01", "status": "approved", "change_type": "tag_enrichment"}
+        ]
+        service._runs["run_4001"] = {
+            "run_id": "run_4001",
+            "state": "ready_safe_auto",
+            "profile": {"note_count": 1},
+            "diagnostics": [],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "one"
+            folder_one.mkdir()
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                return {
+                    "run_id": "run_4001",
+                    "state": "ready_safe_auto",
+                    "profile": {"note_count": 1},
+                    "diagnostics": [],
+                }
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(folder_one)],
+                        "mode": "analyze",
+                    }
+                )
+
+            service.approve_run("run_4001", {"change_types": ["tag_enrichment"]})
+            apply_result = service.apply_run("run_4001", {"change_types": ["tag_enrichment"]})
+
+        self.assertIn("snapshot_id", apply_result)
+        self.assertIsNotNone(apply_result["snapshot_id"])
+
+        updated_parent = service.get_run(parent["run_id"])
+        first_batch = updated_parent["batches"][0]
+        self.assertIn("snapshot_id", first_batch)
+        self.assertEqual(first_batch["snapshot_id"], apply_result["snapshot_id"])
+
+    def test_multiple_batch_checkpoints_tracked_correctly(self):
+        service = ApiService()
+        service._proposals_by_run["run_5001"] = [
+            {"proposal_id": "run_5001-prop-01", "status": "approved", "change_type": "tag_enrichment"}
+        ]
+        service._proposals_by_run["run_5002"] = [
+            {"proposal_id": "run_5002-prop-01", "status": "approved", "change_type": "tag_enrichment"}
+        ]
+        service._runs["run_5001"] = {
+            "run_id": "run_5001",
+            "state": "ready_safe_auto",
+            "profile": {"note_count": 1},
+            "diagnostics": [],
+        }
+        service._runs["run_5002"] = {
+            "run_id": "run_5002",
+            "state": "ready_safe_auto",
+            "profile": {"note_count": 2},
+            "diagnostics": [],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "one"
+            folder_two = root / "two"
+            folder_one.mkdir()
+            folder_two.mkdir()
+
+            def stub_analyze_folder_run(folder_path: object, *, mode: str, persist: bool) -> dict:
+                self.assertEqual(mode, "analyze")
+                self.assertFalse(persist)
+                if folder_path == str(folder_one):
+                    return {
+                        "run_id": "run_5001",
+                        "state": "ready_safe_auto",
+                        "profile": {"note_count": 1},
+                        "diagnostics": [],
+                    }
+                if folder_path == str(folder_two):
+                    return {
+                        "run_id": "run_5002",
+                        "state": "ready_safe_auto",
+                        "profile": {"note_count": 2},
+                        "diagnostics": [],
+                    }
+                raise AssertionError(f"unexpected folder path: {folder_path}")
+
+            with patch.object(service, "_analyze_folder_run", side_effect=stub_analyze_folder_run):
+                parent = service.analyze_folders(
+                    {
+                        "folder_paths": [str(folder_one), str(folder_two)],
+                        "mode": "analyze",
+                    }
+                )
+
+            service.approve_run("run_5001", {"change_types": ["tag_enrichment"]})
+            apply_one = service.apply_run("run_5001", {"change_types": ["tag_enrichment"]})
+
+            service.approve_run("run_5002", {"change_types": ["tag_enrichment"]})
+            apply_two = service.apply_run("run_5002", {"change_types": ["tag_enrichment"]})
+
+        updated_parent = service.get_run(parent["run_id"])
+
+        self.assertIn("applied_batch_ids", updated_parent)
+        self.assertEqual(set(updated_parent["applied_batch_ids"]), {"run_5001", "run_5002"})
+
+        batches_by_run = {b["run_id"]: b for b in updated_parent["batches"]}
+        self.assertEqual(batches_by_run["run_5001"]["snapshot_id"], apply_one["snapshot_id"])
+        self.assertEqual(batches_by_run["run_5002"]["snapshot_id"], apply_two["snapshot_id"])
+
+    def test_full_batch_checkpoint_flow_from_analyze_to_apply(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            folder_one = root / "notes_alpha"
+            folder_two = root / "notes_beta"
+            folder_one.mkdir()
+            folder_two.mkdir()
+            (folder_one / "first.md").write_text("# First Note\nContent for first", encoding="utf-8")
+            (folder_two / "second.md").write_text("# Second Note\nContent for second", encoding="utf-8")
+
+            service = ApiService()
+            parent = service.analyze_folders(
+                {
+                    "folder_paths": [str(folder_one), str(folder_two)],
+                    "mode": "analyze",
+                }
+            )
+
+            self.assertEqual(parent["batch_total"], 2)
+            self.assertEqual(parent["batch_completed"], 2)
+            self.assertEqual(len(parent["batches"]), 2)
+            self.assertEqual(parent["state"], "ready_safe_auto")
+            for batch in parent["batches"]:
+                self.assertIn("snapshot_id", batch)
+                self.assertIsNone(batch["snapshot_id"])
+
+            child_run_ids = [batch["run_id"] for batch in parent["batches"]]
+            self.assertEqual(len(child_run_ids), 2)
+            self.assertTrue(all(rid is not None for rid in child_run_ids))
+
+            apply_results = []
+            for child_run_id in child_run_ids:
+                service.approve_run(child_run_id, {"change_types": ["tag_enrichment"]})
+                apply_result = service.apply_run(child_run_id, {"change_types": ["tag_enrichment"]})
+                self.assertEqual(apply_result["state"], "applied")
+                self.assertIn("snapshot_id", apply_result)
+                self.assertIsNotNone(apply_result["snapshot_id"])
+                apply_results.append(apply_result)
+
+            updated_parent = service.get_run(parent["run_id"])
+            self.assertIn("applied_batch_ids", updated_parent)
+            self.assertEqual(set(updated_parent["applied_batch_ids"]), set(child_run_ids))
+
+            batches_by_run = {b["run_id"]: b for b in updated_parent["batches"]}
+            for child_run_id, apply_result in zip(child_run_ids, apply_results):
+                batch = batches_by_run[child_run_id]
+                self.assertEqual(batch["snapshot_id"], apply_result["snapshot_id"])
+
+            first_child_id = child_run_ids[0]
+            first_snapshot = apply_results[0]["snapshot_id"]
+            rollback_result = service.rollback_run(first_child_id, {"snapshot_id": first_snapshot})
+            self.assertEqual(rollback_result["run_id"], first_child_id)
+            self.assertEqual(rollback_result["state"], "rolled_back")
+            self.assertEqual(rollback_result["rolled_back_snapshot_id"], first_snapshot)
 
 
 class ApiServiceStatePersistenceTests(unittest.TestCase):
