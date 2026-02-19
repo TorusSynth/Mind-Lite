@@ -195,7 +195,9 @@ async function run() {
             json: async () => ({
               draft_id: body.draft_id,
               scores: { overall: 0.45 },
-              gate_passed: false
+              gate_passed: false,
+              hard_fail_reasons: ["missing_citation"],
+              recommended_actions: ["add_source_links"]
             })
           };
         }
@@ -218,6 +220,17 @@ async function run() {
           json: async () => ({
             draft_id: body.draft_id,
             status: "queued_for_gom"
+          })
+        };
+      }
+
+      if (url.endsWith("/publish/mark-for-revision")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            draft_id: body.draft_id,
+            status: "queued_for_revision"
           })
         };
       }
@@ -282,7 +295,7 @@ async function run() {
     assert.deepEqual(collectTextsByTag(gateFailModal.contentEl, "li"), [
       "prepare: ok - target=gom, sanitized=yes",
       "score: ok - overall=0.45, gate_passed=false",
-      "mark-for-gom: failed - Skipped because gate did not pass"
+      "mark-for-revision: ok - queued_for_revision"
     ]);
 
     assert.deepEqual(fetchCalls[0], {
@@ -332,7 +345,19 @@ async function run() {
       }
     });
 
-    assert.equal(fetchCalls.length, 5);
+    assert.deepEqual(fetchCalls[5], {
+      url: "http://localhost:8000/publish/mark-for-revision",
+      method: "POST",
+      body: {
+        draft_id: "draft-fail",
+        title: "draft-fail",
+        prepared_content: "todo",
+        hard_fail_reasons: ["missing_citation"],
+        recommended_actions: ["add_source_links"]
+      }
+    });
+
+    assert.equal(fetchCalls.length, 6);
     assert.equal(notices.length, 0);
     assert.deepEqual(promptCalls, [
       "Draft id",
