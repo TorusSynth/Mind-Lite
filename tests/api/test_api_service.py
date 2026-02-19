@@ -1157,6 +1157,26 @@ class ApiServiceTests(unittest.TestCase):
         self.assertTrue(sprout["gate_passed"])
         self.assertFalse(tree["gate_passed"])
 
+    def test_publish_score_blocks_on_hard_fails(self):
+        service = ApiService()
+        content_with_todo = (
+            "This editorial update includes concrete wins, evidence, and next steps. "
+            "TODO: replace this marker before publish. "
+        ) * 5
+
+        result = service.publish_score({"draft_id": "d1", "content": content_with_todo, "stage": "seed"})
+
+        self.assertEqual(result["scores"]["overall"], 0.7)
+        self.assertFalse(result["gate_passed"])
+        self.assertIn("hard_fail_reasons", result)
+        self.assertIn("recommended_actions", result)
+        self.assertIn("todo_marker_detected", result["hard_fail_reasons"])
+        self.assertIn("safety_subscore_below_floor", result["hard_fail_reasons"])
+        self.assertIn("remove TODO markers before publish", result["recommended_actions"])
+
+        with self.assertRaisesRegex(ValueError, "draft_id"):
+            service.publish_score({"content": content_with_todo, "stage": "seed"})
+
     def test_publish_score_requires_valid_stage(self):
         service = ApiService()
 

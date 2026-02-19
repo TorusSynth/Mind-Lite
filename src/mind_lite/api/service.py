@@ -594,6 +594,16 @@ class ApiService:
             clarity = 0.40
         safety = 0.20 if has_todo else 0.90
         overall = round((structure + clarity + safety) / 3.0, 2)
+        safety_floor = 0.60
+
+        hard_fail_reasons: list[str] = []
+        recommended_actions: list[str] = []
+        if has_todo:
+            hard_fail_reasons.append("todo_marker_detected")
+            recommended_actions.append("remove TODO markers before publish")
+        if safety < safety_floor:
+            hard_fail_reasons.append("safety_subscore_below_floor")
+            recommended_actions.append("improve safety language and remove unsafe placeholders")
 
         return {
             "draft_id": draft_id.strip(),
@@ -605,7 +615,9 @@ class ApiService:
                 "safety": round(safety, 2),
                 "overall": overall,
             },
-            "gate_passed": overall >= threshold,
+            "hard_fail_reasons": hard_fail_reasons,
+            "recommended_actions": recommended_actions,
+            "gate_passed": overall >= threshold and not hard_fail_reasons,
         }
 
     def publish_prepare(self, payload: dict) -> dict:
