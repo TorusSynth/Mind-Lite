@@ -1225,15 +1225,19 @@ class HttpServerTests(unittest.TestCase):
         conn.request(
             "POST",
             "/publish/score",
-            body=json.dumps({"draft_id": "draft_001", "stage": "seed"}),
+            body=json.dumps({"stage": "seed"}),
             headers={"Content-Type": "application/json"},
         )
         resp = conn.getresponse()
         body = json.loads(resp.read().decode("utf-8"))
         conn.close()
 
-        self.assertEqual(resp.status, 400)
-        self.assertIn("error", body)
+        self.assertEqual(resp.status, 200)
+        self.assertFalse(body["gate_passed"])
+        self.assertIn("hard_fail_reasons", body)
+        self.assertIn("recommended_actions", body)
+        self.assertIn("missing_draft_id", body["hard_fail_reasons"])
+        self.assertIn("missing_content", body["hard_fail_reasons"])
 
     def test_publish_prepare_endpoint(self):
         payload = {
