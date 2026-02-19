@@ -121,8 +121,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /publish/prepare`
 - `POST /publish/score`
 - `POST /publish/mark-for-gom`
+- `POST /publish/mark-for-revision`
 - `POST /publish/export-for-gom`
 - `POST /publish/confirm-gom`
+- `GET /publish/revision-queue`
 
 Run locally with:
 
@@ -420,16 +422,77 @@ Check whether payload is cloud-eligible.
 Prepare draft for GOM scoring and sanitization.
 
 ### POST `/publish/score`
-Run editorial rubric scoring.
+Run editorial rubric scoring with stage-aware thresholds.
+
+Request:
+```json
+{
+  "draft_id": "draft_001",
+  "content": "This is a clear project update with concrete outcomes and next steps.",
+  "stage": "seed"
+}
+```
+
+Response:
+```json
+{
+  "draft_id": "draft_001",
+  "stage": "seed",
+  "threshold": 0.7,
+  "scores": {
+    "structure": 0.86,
+    "clarity": 0.9,
+    "safety": 0.9,
+    "overall": 0.89
+  },
+  "hard_fail_reasons": [],
+  "recommended_actions": [],
+  "gate_passed": true
+}
+```
+
+Stage thresholds:
+- `seed`: `0.70`
+- `sprout`: `0.80`
+- `tree`: `0.90`
 
 ### POST `/publish/mark-for-gom`
 Mark draft as publish candidate.
+
+### POST `/publish/mark-for-revision`
+Queue a failed draft for editorial revision follow-up.
+
+Request:
+```json
+{
+  "draft_id": "draft_011",
+  "title": "Project Atlas Revision",
+  "prepared_content": "Needs updates.",
+  "hard_fail_reasons": ["missing_citation"],
+  "recommended_actions": ["add_source_links"]
+}
+```
+
+Response:
+```json
+{
+  "draft_id": "draft_011",
+  "title": "Project Atlas Revision",
+  "prepared_content": "Needs updates.",
+  "hard_fail_reasons": ["missing_citation"],
+  "recommended_actions": ["add_source_links"],
+  "status": "queued_for_revision"
+}
+```
 
 ### GET `/publish/gom-queue`
 List queued publish candidates.
 
 ### GET `/publish/published`
 List published drafts with final URLs.
+
+### GET `/publish/revision-queue`
+List drafts currently queued for revision.
 
 ### POST `/publish/export-for-gom`
 Export markdown/html/json after gate pass.
