@@ -89,8 +89,9 @@ export default class MindLitePlugin extends Plugin {
         }
 
         try {
+          await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/approve`, {});
           await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/apply`, {});
-          new Notice("Mind Lite applied approved proposals.");
+          new Notice("Mind Lite approved and applied proposals.");
         } catch (error) {
           new Notice(createErrorText(error));
         }

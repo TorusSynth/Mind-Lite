@@ -202,11 +202,13 @@ async function run() {
         return {
           ok: true,
           status: 200,
-          json: async () => ([
-            { run_id: "run-1", state: "awaiting_review" },
-            { run_id: "run-2", state: "ready_safe_auto" },
-            { run_id: "run-3", state: "awaiting_review" }
-          ])
+          json: async () => ({
+            runs: [
+              { run_id: "run-1", state: "awaiting_review" },
+              { run_id: "run-2", state: "ready_safe_auto" },
+              { run_id: "run-3", state: "awaiting_review" }
+            ]
+          })
         };
       }
 

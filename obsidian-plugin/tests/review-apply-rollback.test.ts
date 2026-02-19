@@ -199,11 +199,13 @@ async function run() {
         return {
           ok: true,
           status: 200,
-          json: async () => ([
-            { proposal_id: "p1", status: "approved", risk_tier: "high" },
-            { proposal_id: "p2", status: "approved", risk_tier: "high" },
-            { proposal_id: "p3", status: "queued", risk_tier: "low" }
-          ])
+          json: async () => ({
+            proposals: [
+              { proposal_id: "p1", status: "approved", risk_tier: "high" },
+              { proposal_id: "p2", status: "approved", risk_tier: "high" },
+              { proposal_id: "p3", status: "queued", risk_tier: "low" }
+            ]
+          })
         };
       }
 
@@ -231,6 +233,10 @@ async function run() {
     fetchCalls = [];
     await plugin.commands.find((command) => command.id === "mind-lite-apply-approved").callback();
     assert.deepEqual(fetchCalls[0], {
+      url: "http://localhost:8000/runs/run-42/approve",
+      method: "POST"
+    });
+    assert.deepEqual(fetchCalls[1], {
       url: "http://localhost:8000/runs/run-42/apply",
       method: "POST"
     });
@@ -257,6 +263,10 @@ async function run() {
 
     await plugin.commands.find((command) => command.id === "mind-lite-apply-approved").callback();
     assert.deepEqual(fetchCalls[0], {
+      url: "http://localhost:8000/runs/run-42/approve",
+      method: "POST"
+    });
+    assert.deepEqual(fetchCalls[1], {
       url: "http://localhost:8000/runs/run-42/apply",
       method: "POST"
     });

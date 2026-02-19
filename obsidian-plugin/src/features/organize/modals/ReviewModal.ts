@@ -26,6 +26,14 @@ function asProposalArray(value: JSONValue): Proposal[] {
   });
 }
 
+function parseProposalsResponse(value: JSONValue): Proposal[] {
+  if (typeof value !== "object" || value == null || Array.isArray(value)) {
+    return [];
+  }
+
+  return asProposalArray(value.proposals as JSONValue);
+}
+
 function normalizeKeyPart(value: JSONValue | undefined, fallback: string): string {
   if (typeof value !== "string") {
     return fallback;
@@ -60,7 +68,7 @@ export function groupProposalsByStatusAndRisk(proposals: Proposal[]): ProposalGr
 
 async function defaultLoadProposals(runId: string): Promise<Proposal[]> {
   const response = await apiGet<JSONValue>(`/runs/${runId}/proposals`);
-  return asProposalArray(response);
+  return parseProposalsResponse(response);
 }
 
 export class ReviewModal extends Modal {

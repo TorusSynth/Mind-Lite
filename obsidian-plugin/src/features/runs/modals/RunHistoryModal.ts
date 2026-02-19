@@ -16,13 +16,18 @@ function normalizeText(value: unknown, fallback: string): string {
 }
 
 export function parseRunHistoryEntries(value: JSONValue): RunHistoryEntry[] {
-  if (!Array.isArray(value)) {
+  const runs =
+    typeof value === "object" && value != null && !Array.isArray(value)
+      ? (value.runs as JSONValue)
+      : value;
+
+  if (!Array.isArray(runs)) {
     return [];
   }
 
   const entries: RunHistoryEntry[] = [];
 
-  for (const item of value) {
+  for (const item of runs) {
     if (typeof item !== "object" || item == null || Array.isArray(item)) {
       continue;
     }
