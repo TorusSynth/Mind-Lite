@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"require('node:fs').copyFileSync('dist/main.js', 'main.js')\"",
     "dev": "tsc -w -p tsconfig.json",
-    "test": "npm run build && node tests/smoke.test.ts && node tests/api-client.test.ts && node tests/base-modal.test.ts && node tests/analyze-folder.test.ts && node tests/review-apply-rollback.test.ts && node tests/links-commands.test.ts"
+    "test": "npm run build && node tests/smoke.test.ts && node tests/api-client.test.ts && node tests/base-modal.test.ts && node tests/analyze-folder.test.ts && node tests/review-apply-rollback.test.ts && node tests/links-commands.test.ts && node tests/triage-review.test.ts"
   },
   "dependencies": {
     "obsidian": "^1.8.10"

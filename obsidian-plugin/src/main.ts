@@ -1,5 +1,5 @@
 import { Notice, Plugin } from "obsidian";
-import { apiPost } from "./api/client";
+import { apiGet, apiPost } from "./api/client";
 import { LinksReviewModal } from "./features/links/modals/LinksReviewModal";
 import {
   applyLinks,
@@ -9,16 +9,36 @@ import {
   proposeLinks,
   type LinkProposal
 } from "./features/links/propose-links";
+import { analyzeFolder } from "./features/onboarding/analyze-folder";
+import { RunStatusModal } from "./features/onboarding/modals/RunStatusModal";
 import { ReviewModal } from "./features/organize/modals/ReviewModal";
 import { registerAnalyzeFolderCommand } from "./features/onboarding/analyze-folder";
-import { getLastRunId } from "./features/runs/history";
+import { getLastRunId, setLastRunId } from "./features/runs/history";
+import { parseRunHistoryEntries, RunHistoryModal } from "./features/runs/modals/RunHistoryModal";
 import { RollbackModal } from "./features/runs/modals/RollbackModal";
 import { createErrorText } from "./modals/base";
+import type { JSONValue } from "./types/api";
 
 type PromptFn = (message?: string, defaultValue?: string) => string | null;
 
 function getPromptFn(): PromptFn | undefined {
   return (globalThis as typeof globalThis & { prompt?: PromptFn }).prompt;
+}
+
+function resolveDailyTriageFolder(plugin: Plugin): string | null {
+  const workspace = plugin.app.workspace as
+    | {
+        getActiveFile?: () => { parent?: { path?: string } } | null;
+      }
+    | undefined;
+  const activeFolderPath = workspace?.getActiveFile?.()?.parent?.path?.trim();
+  if (activeFolderPath != null && activeFolderPath.length > 0) {
+    return activeFolderPath;
+  }
+
+  const adapter = plugin.app.vault.adapter as { basePath?: string } | undefined;
+  const basePath = adapter?.basePath?.trim();
+  return basePath != null && basePath.length > 0 ? basePath : null;
 }
 
 export default class MindLitePlugin extends Plugin {
@@ -143,6 +163,41 @@ export default class MindLitePlugin extends Plugin {
           const minimumConfidence = parseMinimumConfidence(rawMinimumConfidence);
           await applyLinks(this.lastLinkSourceNoteId!, this.lastLinkSuggestions, minimumConfidence);
           new Notice("Mind Lite applied links.");
+        } catch (error) {
+          new Notice(createErrorText(error));
+        }
+      }
+    });
+
+    this.addCommand({
+      id: "mind-lite-daily-triage",
+      name: "Mind Lite: Daily Triage",
+      callback: async () => {
+        const folderPath = resolveDailyTriageFolder(this);
+        if (folderPath == null) {
+          new Notice("Mind Lite could not detect an active folder for daily triage.");
+          return;
+        }
+
+        try {
+          const result = await analyzeFolder(folderPath);
+          setLastRunId(result.run_id);
+          new RunStatusModal(this.app, result).open();
+          new Notice(`Mind Lite daily triage complete: ${result.run_id} (${result.state})`);
+        } catch (error) {
+          new Notice(createErrorText(error));
+        }
+      }
+    });
+
+    this.addCommand({
+      id: "mind-lite-weekly-deep-review",
+      name: "Mind Lite: Weekly Deep Review",
+      callback: async () => {
+        try {
+          const response = await apiGet<JSONValue>("/runs");
+          const runs = parseRunHistoryEntries(response);
+          new RunHistoryModal(this.app, runs).open();
         } catch (error) {
           new Notice(createErrorText(error));
         }
