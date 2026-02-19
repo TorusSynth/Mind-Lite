@@ -1763,5 +1763,25 @@ class TestOrganizeClassifyLLM:
         assert result["results"][0]["action_mode"] == "auto"
 
 
+class TestLinksProposeLLM:
+    def test_uses_llm_scoring(self, monkeypatch):
+        from mind_lite.api.service import ApiService
+
+        def mock_score(source, candidates):
+            return [
+                {"target_note_id": "c1", "confidence": 0.92, "reason": "shared_project_context"},
+            ]
+        monkeypatch.setattr("mind_lite.links.propose_llm.score_links", mock_score)
+
+        service = ApiService()
+        result = service.links_propose({
+            "source_note_id": "s1",
+            "candidate_notes": [{"note_id": "c1", "title": "C1", "tags": [], "content_preview": ""}]
+        })
+        assert result["suggestions"][0]["target_note_id"] == "c1"
+        assert result["suggestions"][0]["confidence"] == 0.92
+        assert result["suggestions"][0]["reason"] == "shared_project_context"
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -868,6 +868,9 @@ class ApiService:
         return {"proposals": proposals}
 
     def links_propose(self, payload: dict) -> dict:
+        from mind_lite.links.propose_llm import score_links, apply_spam_controls
+        from collections import Counter
+
         source_note_id = payload.get("source_note_id")
         if not isinstance(source_note_id, str) or not source_note_id.strip():
             raise ValueError("source_note_id is required")
@@ -876,27 +879,21 @@ class ApiService:
         if not isinstance(candidate_notes, list) or not candidate_notes:
             raise ValueError("candidate_notes must be a non-empty list")
 
-        suggestions = []
+        source_note = {"note_id": source_note_id.strip()}
+        for key in ["title", "tags", "content_preview"]:
+            if key in payload:
+                source_note[key] = payload[key]
+
         for note in candidate_notes:
             if not isinstance(note, dict):
                 raise ValueError("each candidate note must be an object")
             note_id = note.get("note_id")
-            title = note.get("title")
             if not isinstance(note_id, str) or not note_id.strip():
                 raise ValueError("candidate note_id is required")
-            if not isinstance(title, str) or not title.strip():
-                raise ValueError("candidate title is required")
 
-            confidence = self._link_confidence(title)
-            suggestions.append(
-                {
-                    "target_note_id": note_id.strip(),
-                    "confidence": confidence,
-                    "reason": self._link_reason(title),
-                }
-            )
+        suggestions = score_links(source_note, candidate_notes)
+        suggestions = apply_spam_controls(suggestions, existing_links=set(), batch_targets=Counter())
 
-        suggestions.sort(key=lambda item: item["confidence"], reverse=True)
         return {
             "source_note_id": source_note_id.strip(),
             "suggestions": suggestions,
@@ -1247,22 +1244,6 @@ class ApiService:
             ]
         }
         return json.dumps(payload, sort_keys=True)
-
-    def _link_confidence(self, title: str) -> float:
-        lowered = title.lower()
-        if "atlas" in lowered or "architecture" in lowered:
-            return 0.88
-        if "project" in lowered:
-            return 0.82
-        return 0.61
-
-    def _link_reason(self, title: str) -> str:
-        lowered = title.lower()
-        if "atlas" in lowered:
-            return "shared_project_context"
-        if "architecture" in lowered:
-            return "structural_overlap"
-        return "semantic_similarity"
 
     def _proposed_folder(self, title: str, current_folder: str) -> str:
         lowered = title.lower()
