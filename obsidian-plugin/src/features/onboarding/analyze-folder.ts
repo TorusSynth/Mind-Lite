@@ -1,4 +1,4 @@
-import type { Plugin } from "obsidian";
+import { Notice, type Plugin } from "obsidian";
 import { apiPost } from "../../api/client";
 import { AnalyzeModal } from "./modals/AnalyzeModal";
 import { RunStatusModal } from "./modals/RunStatusModal";
@@ -23,10 +23,10 @@ export async function analyzeFolder(folderPath: string): Promise<AnalyzeFolderRe
   });
 }
 
-function resolveDefaultFolderPath(plugin: Plugin): string {
-  const adapter = plugin.app.vault.adapter as { basePath?: string };
-  const basePath = adapter.basePath?.trim();
-  return basePath && basePath.length > 0 ? basePath : ".";
+function resolveDefaultFolderPath(plugin: Plugin): string | null {
+  const adapter = plugin.app.vault.adapter as { basePath?: string } | undefined;
+  const basePath = adapter?.basePath?.trim();
+  return basePath && basePath.length > 0 ? basePath : null;
 }
 
 export function registerAnalyzeFolderCommand(plugin: Plugin): void {
@@ -34,9 +34,14 @@ export function registerAnalyzeFolderCommand(plugin: Plugin): void {
     id: "mind-lite-analyze-folder",
     name: "Mind Lite: Analyze Folder",
     callback: () => {
+      const defaultFolderPath = resolveDefaultFolderPath(plugin);
+      if (defaultFolderPath == null) {
+        new Notice("Mind Lite could not detect your vault path. Enter a folder path to continue.");
+      }
+
       const modal = new AnalyzeModal(
         plugin.app,
-        resolveDefaultFolderPath(plugin),
+        defaultFolderPath ?? "",
         analyzeFolder,
         (result) => {
           new RunStatusModal(plugin.app, result).open();

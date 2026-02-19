@@ -60,6 +60,11 @@ export class AnalyzeModal extends Modal {
 
     setPrimaryAction(analyzeButtonEl, "Analyze", async () => {
       const folderPath = inputEl.value.trim() || this.defaultFolderPath;
+      if (folderPath.trim().length === 0) {
+        showError(errorEl, "Enter a folder path.");
+        return;
+      }
+
       showError(errorEl, null);
       showLoading(loadingEl, true, "Analyzing folder...");
 
