@@ -13,6 +13,9 @@ import { analyzeFolder } from "./features/onboarding/analyze-folder";
 import { RunStatusModal } from "./features/onboarding/modals/RunStatusModal";
 import { ReviewModal } from "./features/organize/modals/ReviewModal";
 import { registerAnalyzeFolderCommand } from "./features/onboarding/analyze-folder";
+import { prepareDraftForGom, runGomGateFlow } from "./features/publish/gom-flow";
+import { GateResultsModal } from "./features/publish/modals/GateResultsModal";
+import { PrepareModal } from "./features/publish/modals/PrepareModal";
 import { getLastRunId, setLastRunId } from "./features/runs/history";
 import { parseRunHistoryEntries, RunHistoryModal } from "./features/runs/modals/RunHistoryModal";
 import { RollbackModal } from "./features/runs/modals/RollbackModal";
@@ -198,6 +201,41 @@ export default class MindLitePlugin extends Plugin {
           const response = await apiGet<JSONValue>("/runs");
           const runs = parseRunHistoryEntries(response);
           new RunHistoryModal(this.app, runs).open();
+        } catch (error) {
+          new Notice(createErrorText(error));
+        }
+      }
+    });
+
+    this.addCommand({
+      id: "mind-lite-publish-to-gom",
+      name: "Mind Lite: Publish to GOM",
+      callback: async () => {
+        const prompt = getPromptFn();
+        const draftId = prompt?.("Draft id", "");
+        if (draftId == null) {
+          return;
+        }
+
+        const content = prompt?.("Content", "");
+        if (content == null) {
+          return;
+        }
+
+        const target = prompt?.("Target", "gom") ?? "gom";
+        const normalizedTarget = target.trim().length > 0 ? target.trim() : "gom";
+
+        try {
+          const payload = {
+            draft_id: draftId,
+            content,
+            target: normalizedTarget
+          };
+          const prepared = await prepareDraftForGom(payload);
+          new PrepareModal(this.app, payload, prepared.prepared_content, prepared.sanitized === true, async () => {
+            const flowResult = await runGomGateFlow(prepared);
+            new GateResultsModal(this.app, flowResult).open();
+          }).open();
         } catch (error) {
           new Notice(createErrorText(error));
         }
