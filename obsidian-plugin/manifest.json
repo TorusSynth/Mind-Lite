@@ -1,0 +1,10 @@
+{
+  "id": "mind-lite",
+  "name": "Mind Lite",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Minimal Mind Lite plugin scaffold.",
+  "author": "Mind Lite",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

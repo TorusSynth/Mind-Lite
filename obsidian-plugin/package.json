@@ -1,0 +1,18 @@
+{
+  "name": "obsidian-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -w -p tsconfig.json",
+    "test": "node tests/smoke.test.ts"
+  },
+  "dependencies": {
+    "obsidian": "^1.8.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3"
+  }
+}
