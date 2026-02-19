@@ -451,6 +451,42 @@ Response:
 }
 ```
 
+Gate-fail contract (missing or invalid `stage`):
+
+```json
+{
+  "draft_id": "draft_001",
+  "stage": "",
+  "threshold": null,
+  "scores": {
+    "structure": 0.86,
+    "clarity": 0.9,
+    "safety": 0.9,
+    "overall": 0.89
+  },
+  "hard_fail_reasons": ["missing_stage"],
+  "recommended_actions": ["provide stage: seed, sprout, or tree"],
+  "gate_passed": false
+}
+```
+
+```json
+{
+  "draft_id": "draft_001",
+  "stage": "sapling",
+  "threshold": null,
+  "scores": {
+    "structure": 0.86,
+    "clarity": 0.9,
+    "safety": 0.9,
+    "overall": 0.89
+  },
+  "hard_fail_reasons": ["invalid_stage"],
+  "recommended_actions": ["use stage: seed, sprout, or tree"],
+  "gate_passed": false
+}
+```
+
 Stage thresholds:
 - `seed`: `0.70`
 - `sprout`: `0.80`
@@ -493,6 +529,23 @@ List published drafts with final URLs.
 
 ### GET `/publish/revision-queue`
 List drafts currently queued for revision.
+
+Response:
+```json
+{
+  "count": 1,
+  "items": [
+    {
+      "draft_id": "draft_012",
+      "title": "Project Atlas Queue",
+      "prepared_content": "Pending revision.",
+      "hard_fail_reasons": ["sensitive_content"],
+      "recommended_actions": ["remove_secret"],
+      "status": "queued_for_revision"
+    }
+  ]
+}
+```
 
 ### POST `/publish/export-for-gom`
 Export markdown/html/json after gate pass.
