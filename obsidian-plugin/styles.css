@@ -1,2 +1,27 @@
 .mind-lite-plugin {
 }
+
+.mind-lite-modal__hidden {
+  display: none;
+}
+
+.mind-lite-modal__loading {
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+
+.mind-lite-modal__error {
+  margin-top: 8px;
+  color: var(--text-error);
+}
+
+.mind-lite-modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.mind-lite-modal__action {
+  min-width: 96px;
+}
