@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"require('node:fs').copyFileSync('dist/main.js', 'main.js')\"",
     "dev": "tsc -w -p tsconfig.json",
-    "test": "node tests/smoke.test.ts"
+    "test": "npm run build && node tests/smoke.test.ts"
   },
   "dependencies": {
     "obsidian": "^1.8.10"
