@@ -1174,17 +1174,24 @@ class ApiServiceTests(unittest.TestCase):
         self.assertIn("safety_subscore_below_floor", result["hard_fail_reasons"])
         self.assertIn("remove TODO markers before publish", result["recommended_actions"])
 
-        with self.assertRaisesRegex(ValueError, "draft_id"):
-            service.publish_score({"content": content_with_todo, "stage": "seed"})
+        missing_draft = service.publish_score({"content": content_with_todo, "stage": "seed"})
+        self.assertFalse(missing_draft["gate_passed"])
+        self.assertIn("missing_draft_id", missing_draft["hard_fail_reasons"])
 
     def test_publish_score_requires_valid_stage(self):
         service = ApiService()
 
-        with self.assertRaisesRegex(ValueError, "stage"):
-            service.publish_score({"draft_id": "d1", "content": "valid content without TODO"})
+        missing_stage = service.publish_score({"draft_id": "d1", "content": "valid content without TODO"})
+        self.assertFalse(missing_stage["gate_passed"])
+        self.assertIn("missing_stage", missing_stage["hard_fail_reasons"])
+        self.assertIn("provide stage: seed, sprout, or tree", missing_stage["recommended_actions"])
 
-        with self.assertRaisesRegex(ValueError, "stage"):
-            service.publish_score({"draft_id": "d1", "content": "valid content without TODO", "stage": "sapling"})
+        invalid_stage = service.publish_score(
+            {"draft_id": "d1", "content": "valid content without TODO", "stage": "sapling"}
+        )
+        self.assertFalse(invalid_stage["gate_passed"])
+        self.assertEqual(invalid_stage["threshold"], None)
+        self.assertIn("invalid_stage", invalid_stage["hard_fail_reasons"])
 
     def test_publish_prepare_returns_sanitized_draft_payload(self):
         service = ApiService()

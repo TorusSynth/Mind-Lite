@@ -561,27 +561,20 @@ class ApiService:
 
     def publish_score(self, payload: dict) -> dict:
         draft_id = payload.get("draft_id")
-        if not isinstance(draft_id, str) or not draft_id.strip():
-            raise ValueError("draft_id is required")
+        normalized_draft_id = draft_id.strip() if isinstance(draft_id, str) else ""
 
         content = payload.get("content")
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError("content is required")
+        normalized = content.strip() if isinstance(content, str) else ""
 
         stage = payload.get("stage")
-        if not isinstance(stage, str) or not stage.strip():
-            raise ValueError("stage is required")
-        normalized_stage = stage.strip()
+        normalized_stage = stage.strip() if isinstance(stage, str) else ""
         thresholds = {
             "seed": 0.70,
             "sprout": 0.80,
             "tree": 0.90,
         }
         threshold = thresholds.get(normalized_stage)
-        if threshold is None:
-            raise ValueError("stage must be one of: seed, sprout, tree")
 
-        normalized = content.strip()
         word_count = len(normalized.split())
         has_todo = "todo" in normalized.lower()
 
@@ -598,6 +591,18 @@ class ApiService:
 
         hard_fail_reasons: list[str] = []
         recommended_actions: list[str] = []
+        if not normalized_draft_id:
+            hard_fail_reasons.append("missing_draft_id")
+            recommended_actions.append("provide a non-empty draft_id")
+        if not normalized:
+            hard_fail_reasons.append("missing_content")
+            recommended_actions.append("provide non-empty content")
+        if not normalized_stage:
+            hard_fail_reasons.append("missing_stage")
+            recommended_actions.append("provide stage: seed, sprout, or tree")
+        elif threshold is None:
+            hard_fail_reasons.append("invalid_stage")
+            recommended_actions.append("use stage: seed, sprout, or tree")
         if has_todo:
             hard_fail_reasons.append("todo_marker_detected")
             recommended_actions.append("remove TODO markers before publish")
@@ -606,7 +611,7 @@ class ApiService:
             recommended_actions.append("improve safety language and remove unsafe placeholders")
 
         return {
-            "draft_id": draft_id.strip(),
+            "draft_id": normalized_draft_id,
             "stage": normalized_stage,
             "threshold": threshold,
             "scores": {
@@ -617,7 +622,7 @@ class ApiService:
             },
             "hard_fail_reasons": hard_fail_reasons,
             "recommended_actions": recommended_actions,
-            "gate_passed": overall >= threshold and not hard_fail_reasons,
+            "gate_passed": threshold is not None and overall >= threshold and not hard_fail_reasons,
         }
 
     def publish_prepare(self, payload: dict) -> dict:
