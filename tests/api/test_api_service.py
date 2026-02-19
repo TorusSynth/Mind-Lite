@@ -1262,6 +1262,67 @@ class ApiServiceTests(unittest.TestCase):
         self.assertTrue(second["idempotency"]["duplicate"])
         self.assertEqual(second["draft_id"], first["draft_id"])
 
+    def test_mark_for_revision_enqueues_failed_draft(self):
+        service = ApiService()
+
+        marked = service.mark_for_revision(
+            {
+                "draft_id": "draft_rev_010",
+                "title": "Project Atlas Weekly",
+                "prepared_content": "Needs revision before publish.",
+                "hard_fail_reasons": ["todo_marker_detected"],
+            }
+        )
+        queue = service.list_revision_queue()
+
+        self.assertEqual(marked["draft_id"], "draft_rev_010")
+        self.assertEqual(marked["status"], "queued_for_revision")
+        self.assertEqual(queue["count"], 1)
+        self.assertEqual(queue["items"][0]["draft_id"], "draft_rev_010")
+
+    def test_list_revision_queue_returns_count_and_items(self):
+        service = ApiService()
+        service.mark_for_revision(
+            {
+                "draft_id": "draft_rev_011",
+                "title": "Draft One",
+                "prepared_content": "Needs edits.",
+            }
+        )
+        service.mark_for_revision(
+            {
+                "draft_id": "draft_rev_012",
+                "title": "Draft Two",
+                "prepared_content": "Needs more edits.",
+            }
+        )
+
+        queue = service.list_revision_queue()
+
+        self.assertEqual(queue["count"], 2)
+        self.assertEqual([item["draft_id"] for item in queue["items"]], ["draft_rev_011", "draft_rev_012"])
+
+    def test_persisted_state_reload_includes_revision_queue(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            state_file = root / "state.json"
+
+            service = ApiService(state_file=str(state_file))
+            service.mark_for_revision(
+                {
+                    "draft_id": "draft_rev_013",
+                    "title": "Reload Draft",
+                    "prepared_content": "Should survive reload.",
+                    "hard_fail_reasons": ["safety_subscore_below_floor"],
+                }
+            )
+
+            reloaded = ApiService(state_file=str(state_file))
+            queue = reloaded.list_revision_queue()
+
+            self.assertEqual(queue["count"], 1)
+            self.assertEqual(queue["items"][0]["draft_id"], "draft_rev_013")
+
     def test_export_for_gom_returns_export_payload_for_queued_draft(self):
         service = ApiService()
         service.mark_for_gom(

@@ -26,6 +26,7 @@ class ApiService:
         self._runs: dict[str, dict] = {}
         self._proposals_by_run: dict[str, list[dict]] = {}
         self._gom_queue: list[dict] = []
+        self._revision_queue: list[dict] = []
         self._gom_published: list[dict] = []
         self._snapshot_store = SnapshotStore()
         self._run_counter = 0
@@ -703,6 +704,48 @@ class ApiService:
             "items": items,
         }
 
+    def mark_for_revision(self, payload: dict) -> dict:
+        draft_id = payload.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            raise ValueError("draft_id is required")
+
+        title = payload.get("title")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("title is required")
+
+        prepared_content = payload.get("prepared_content")
+        if not isinstance(prepared_content, str) or not prepared_content.strip():
+            raise ValueError("prepared_content is required")
+
+        hard_fail_reasons = payload.get("hard_fail_reasons", [])
+        if not isinstance(hard_fail_reasons, list) or not all(isinstance(reason, str) for reason in hard_fail_reasons):
+            raise ValueError("hard_fail_reasons must be a list of strings")
+
+        recommended_actions = payload.get("recommended_actions", [])
+        if not isinstance(recommended_actions, list) or not all(
+            isinstance(action, str) for action in recommended_actions
+        ):
+            raise ValueError("recommended_actions must be a list of strings")
+
+        item = {
+            "draft_id": draft_id.strip(),
+            "title": title.strip(),
+            "prepared_content": prepared_content.strip(),
+            "hard_fail_reasons": list(hard_fail_reasons),
+            "recommended_actions": list(recommended_actions),
+            "status": "queued_for_revision",
+        }
+        self._revision_queue.append(item)
+        self._persist_state()
+        return deepcopy(item)
+
+    def list_revision_queue(self) -> dict:
+        items = deepcopy(self._revision_queue)
+        return {
+            "count": len(items),
+            "items": items,
+        }
+
     def export_for_gom(self, payload: dict) -> dict:
         event_id = payload.get("event_id")
         if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
@@ -1067,6 +1110,11 @@ class ApiService:
             for item in payload.get("gom_queue", [])
             if isinstance(item, dict)
         ]
+        self._revision_queue = [
+            dict(item)
+            for item in payload.get("revision_queue", [])
+            if isinstance(item, dict)
+        ]
         self._gom_published = [
             dict(item)
             for item in payload.get("gom_published", [])
@@ -1131,6 +1179,7 @@ class ApiService:
             "runs": self._runs,
             "proposals": self._proposals_by_run,
             "gom_queue": self._gom_queue,
+            "revision_queue": self._revision_queue,
             "gom_published": self._gom_published,
             "ask_replay": self._ask_response_by_event,
             "links_apply_replay": self._links_apply_response_by_event,
