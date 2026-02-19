@@ -1369,14 +1369,20 @@ class ApiServiceTests(unittest.TestCase):
     def test_organize_classify_returns_para_labels(self):
         service = ApiService()
 
-        result = service.organize_classify(
-            {
-                "notes": [
-                    {"note_id": "n1", "title": "Project Atlas Weekly Plan"},
-                    {"note_id": "n2", "title": "Reference Notes: Zettelkasten"},
-                ]
-            }
-        )
+        def mock_classify(note):
+            if note.get("note_id") == "n1":
+                return {"primary": "project", "secondary": [], "confidence": 0.86}
+            return {"primary": "resource", "secondary": [], "confidence": 0.79}
+
+        with patch("mind_lite.organize.classify_llm.classify_note", side_effect=mock_classify):
+            result = service.organize_classify(
+                {
+                    "notes": [
+                        {"note_id": "n1", "title": "Project Atlas Weekly Plan"},
+                        {"note_id": "n2", "title": "Reference Notes: Zettelkasten"},
+                    ]
+                }
+            )
 
         self.assertEqual(len(result["results"]), 2)
         self.assertEqual(result["results"][0]["note_id"], "n1")
@@ -1384,11 +1390,11 @@ class ApiServiceTests(unittest.TestCase):
         self.assertEqual(result["results"][1]["note_id"], "n2")
         self.assertEqual(result["results"][1]["primary_para"], "resource")
 
-    def test_organize_classify_requires_note_id_and_title(self):
+    def test_organize_classify_requires_note_id(self):
         service = ApiService()
 
         with self.assertRaises(ValueError):
-            service.organize_classify({"notes": [{"note_id": "n1"}]})
+            service.organize_classify({"notes": [{}]})
 
     def test_links_propose_returns_scored_suggestions(self):
         service = ApiService()
@@ -1732,6 +1738,29 @@ class ApiServiceStatePersistenceTests(unittest.TestCase):
             self.assertEqual(replayed["draft_id"], first["draft_id"])
             self.assertEqual(replayed["format"], first["format"])
             self.assertEqual(replayed["artifact"], first["artifact"])
+
+
+class TestOrganizeClassifyLLM:
+    def test_uses_llm_classification(self, monkeypatch):
+        from mind_lite.api.service import ApiService
+
+        def mock_classify(note):
+            return {
+                "note_id": note["note_id"],
+                "primary": "project",
+                "secondary": ["area"],
+                "confidence": 0.88,
+            }
+        monkeypatch.setattr("mind_lite.organize.classify_llm.classify_note", mock_classify)
+
+        service = ApiService()
+        result = service.organize_classify({
+            "notes": [{"note_id": "x", "title": "Test Note", "folder": "", "tags": [], "content_preview": ""}]
+        })
+        assert result["results"][0]["primary_para"] == "project"
+        assert result["results"][0]["secondary_para"] == ["area"]
+        assert result["results"][0]["confidence"] == 0.88
+        assert result["results"][0]["action_mode"] == "auto"
 
 
 if __name__ == "__main__":
