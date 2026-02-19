@@ -83,3 +83,13 @@ class TestScoreLinks:
         result = score_links(source, candidates)
         assert len(result) == 1
         assert result[0]["confidence"] == 0.88
+
+    def test_llm_failure_returns_empty(self, monkeypatch):
+        def mock_llm_fail(prompt):
+            return '{"suggestions": []}'
+        monkeypatch.setattr("mind_lite.links.propose_llm._call_llm", mock_llm_fail)
+
+        source = {"note_id": "s1", "title": "Source", "tags": [], "content_preview": ""}
+        candidates = [{"note_id": "c1", "title": "C1", "tags": [], "content_preview": ""}]
+        result = score_links(source, candidates)
+        assert result == []

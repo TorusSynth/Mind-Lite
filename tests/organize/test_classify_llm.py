@@ -60,3 +60,13 @@ class TestClassifyNote:
         assert result["primary"] == "project"
         assert "area" in result["secondary"]
         assert result["confidence"] == 0.82
+
+    def test_llm_failure_returns_fallback(self, monkeypatch):
+        def mock_llm_fail(prompt):
+            return '{"primary": "resource", "secondary": [], "confidence": 0.5}'
+        monkeypatch.setattr("mind_lite.organize.classify_llm._call_llm", mock_llm_fail)
+        
+        note = {"note_id": "x", "title": "Test", "folder": "", "tags": [], "content_preview": ""}
+        result = classify_note(note)
+        assert result["primary"] == "resource"
+        assert result["confidence"] == 0.5
