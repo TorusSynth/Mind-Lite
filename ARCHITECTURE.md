@@ -32,6 +32,10 @@ Architecture-level milestones completed:
 - Batch checkpoint snapshot tracking per applied child run (`snapshot_id`, `applied_batch_ids`) implemented
 - Lifecycle-validated state transitions enforced for analyze/approve/apply paths
 - Full `PYTHONPATH=src python3 -m unittest discover -q` verification passed after staged onboarding transitions
+- **Phase C: LLM Integration for Organization and Links**
+  - PARA classification LLM module (`organize/classify_llm.py`) with prompt building and response parsing
+  - Link scoring LLM module (`links/propose_llm.py`) with anti-spam controls
+  - Graceful degradation on LLM failure with safe defaults
 
 ---
 

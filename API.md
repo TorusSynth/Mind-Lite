@@ -81,6 +81,13 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - Metrics endpoint includes publish queue and published counters in `src/mind_lite/api/service.py`
 - Optional file-backed API state persistence implemented in `src/mind_lite/api/service.py`
 - HTTP server state-file wiring implemented in `src/mind_lite/api/http_server.py`
+- **Phase C: LLM Integration for Organization and Links**
+  - PARA classification LLM module implemented in `src/mind_lite/organize/classify_llm.py`
+  - Link scoring LLM module implemented in `src/mind_lite/links/propose_llm.py`
+  - `organize_classify` endpoint integrated with LLM-based PARA classification
+  - `links_propose` endpoint integrated with LLM-based link scoring
+  - Anti-spam controls: confidence threshold (0.50), target saturation limit (3), max suggestions (10)
+  - Graceful fallback on LLM failure (returns safe defaults)
 
 ---
 
