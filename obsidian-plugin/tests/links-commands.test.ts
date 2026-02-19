@@ -100,6 +100,7 @@ async function run() {
   const originalPrompt = globalThis.prompt;
 
   const openedModals = [];
+  const notices = [];
 
   Module._load = function patchedLoad(request, parent, isMain) {
     if (request === "obsidian") {
@@ -140,7 +141,9 @@ async function run() {
         App: class App {},
         Plugin,
         Notice: class Notice {
-          constructor() {}
+          constructor(message) {
+            notices.push(message);
+          }
         }
       };
     }
@@ -164,11 +167,21 @@ async function run() {
     const fetchCalls = [];
     const promptCalls = [];
     const promptResponses = ["source-note", "candidate-z, candidate-a, candidate-b", "0.72"];
+    let failNextProposeRequest = false;
     globalThis.fetch = async (url, init) => {
       const body = init?.body == null ? undefined : JSON.parse(init.body);
       fetchCalls.push({ url, method: init?.method, body });
 
       if (url.endsWith("/links/propose")) {
+        if (failNextProposeRequest) {
+          failNextProposeRequest = false;
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ message: "boom" })
+          };
+        }
+
         return {
           ok: true,
           status: 200,
@@ -240,6 +253,32 @@ async function run() {
       "Candidate note ids (comma-separated)",
       "Minimum confidence (0-1, optional)"
     ]);
+
+    promptResponses.push(null);
+    await plugin.commands.find((command) => command.id === "mind-lite-propose-links").callback();
+
+    const fetchCountAfterCancelledPropose = fetchCalls.length;
+    const promptCountAfterCancelledPropose = promptCalls.length;
+
+    await plugin.commands.find((command) => command.id === "mind-lite-apply-links").callback();
+
+    assert.equal(fetchCalls.length, fetchCountAfterCancelledPropose);
+    assert.equal(promptCalls.length, promptCountAfterCancelledPropose);
+
+    promptResponses.push("source-note", "candidate-z, candidate-a");
+    failNextProposeRequest = true;
+    await plugin.commands.find((command) => command.id === "mind-lite-propose-links").callback();
+
+    const fetchCountAfterFailedPropose = fetchCalls.length;
+    const promptCountAfterFailedPropose = promptCalls.length;
+
+    await plugin.commands.find((command) => command.id === "mind-lite-apply-links").callback();
+
+    assert.equal(fetchCalls.length, fetchCountAfterFailedPropose);
+    assert.equal(promptCalls.length, promptCountAfterFailedPropose);
+
+    const noCacheNotice = "No fresh link suggestions available. Run Propose Links first.";
+    assert.equal(notices.filter((message) => message === noCacheNotice).length, 2);
 
     console.log("Links commands test passed");
   } finally {
