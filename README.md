@@ -101,6 +101,12 @@ Expected log:
 Mind Lite API listening on http://127.0.0.1:8000
 ```
 
+Quick health check:
+
+```bash
+curl -s http://127.0.0.1:8000/health
+```
+
 ### 3) Build and install Obsidian plugin
 
 ```bash
@@ -134,6 +140,12 @@ Mind Lite currently uses an OpenAI-compatible local endpoint for LLM tasks (clas
    - `http://localhost:1234/v1/chat/completions`
 3. Load any model in LM Studio and keep server running
 
+Quick LM Studio check:
+
+```bash
+curl -s http://localhost:1234/v1/models
+```
+
 Mind Lite calls this endpoint for:
 
 - PARA classification (`organize/classify_llm.py`)
@@ -141,7 +153,7 @@ Mind Lite calls this endpoint for:
 
 ### External provider note
 
-Routing policies include cloud fallback concepts (for example `openai` routing decisions), but this repository currently documents and supports the local LM Studio path as the concrete setup flow.
+Routing policies include cloud fallback concepts (for example `openai` routing decisions), but this repository currently ships with local LM Studio setup as the documented, hands-on path.
 
 ---
 
@@ -170,6 +182,13 @@ Imagine you have a folder `Projects/Atlas` with mixed notes, weak tags, and brok
    - enter draft data + stage (`seed`, `sprout`, or `tree`)
    - if gate passes -> draft is queued for GOM
    - if gate fails -> draft is routed to revision queue with hard-fail reasons and recommended actions
+
+7. Validate queue outcome from terminal
+
+```bash
+curl -s http://127.0.0.1:8000/publish/gom-queue
+curl -s http://127.0.0.1:8000/publish/revision-queue
+```
 
 ---
 
