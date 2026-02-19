@@ -17,7 +17,7 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 
 ---
 
-## Implementation Status (Phases A-E)
+## Implementation Status (Phases A-F)
 
 Canonical endpoint-level implementation status is maintained in `API.md`.
 
@@ -41,6 +41,10 @@ Architecture-level milestones completed:
   - Review and run operations implemented with dedicated modals (`ReviewModal`, `RunHistoryModal`, `RollbackModal`, publish gate modals)
   - Daily triage and weekly deep review workflows implemented on top of onboarding/run history endpoints
   - Plugin API client currently targets local API only at `http://localhost:8000`
+- **Phase F: Editorial gate hardening**
+  - Editorial gate checks hardened for publish readiness (metadata, sanitization, sensitivity/grounding hard-fails, stage thresholds)
+  - Revision queue and publish queue separation enforced in gate outcomes and plugin publish-review flow
+  - Revision queue status surfaced as an explicit "needs revision" path before publish eligibility
 
 ---
 

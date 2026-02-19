@@ -144,6 +144,8 @@ Build an Obsidian-native, local-first second brain that:
 
 ## Phase F - GOM Publishing and Editorial Gate
 
+**Progress:** Editorial gate hardening complete; revision queue path active and separated from publish-ready queue.
+
 ### Scope
 - GOM stage-aware publication flow (seed/sprout/tree)
 - Strict rubric scoring + hard fail checks
@@ -154,6 +156,7 @@ Build an Obsidian-native, local-first second brain that:
 - Required metadata and sanitization checks pass
 - Editorial scoring thresholds enforced
 - Publish flow works from Obsidian without bypassing gate
+- Revision-required drafts are routed to revision queue with explicit status until re-validated
 
 ---
 
