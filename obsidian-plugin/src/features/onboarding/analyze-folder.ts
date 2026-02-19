@@ -1,5 +1,6 @@
 import { Notice, type Plugin } from "obsidian";
 import { apiPost } from "../../api/client";
+import { setLastRunId } from "../runs/history";
 import { AnalyzeModal } from "./modals/AnalyzeModal";
 import { RunStatusModal } from "./modals/RunStatusModal";
 
@@ -44,6 +45,7 @@ export function registerAnalyzeFolderCommand(plugin: Plugin): void {
         defaultFolderPath ?? "",
         analyzeFolder,
         (result) => {
+          setLastRunId(result.run_id);
           new RunStatusModal(plugin.app, result).open();
         }
       );
