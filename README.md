@@ -1,25 +1,21 @@
 # Mind Lite
 
-Local-first, Obsidian-native second brain automation with safety-first execution and editorially gated publishing.
+Mind Lite is a local-first automation layer for Obsidian that helps you organize notes, rebuild useful graph links, and publish through a strict editorial gate.
 
-**Status:** Active implementation (Phases A-F delivered)  
-**API Runtime:** `http://127.0.0.1:8000`  
-**Primary Surfaces:** Python API + Obsidian plugin
+**Status:** Active implementation (Phases A-F complete)  
+**Runtime API:** `http://127.0.0.1:8000`  
+**Primary interfaces:** Python API + Obsidian plugin
 
 ---
 
-## What Mind Lite Does
+## What You Can Do With It
 
-Mind Lite helps you turn a large, messy Obsidian vault into something operational without giving up control.
-
-- Analyze vault folders in batches
-- Auto-apply low-risk improvements
-- Send structural or risky changes to review
-- Propose and apply graph links with anti-spam controls
-- Route AI work local-first
-- Publish to GOM only after stage-aware editorial gate checks
-
-This project is intentionally built to be both useful and portfolio-ready: it demonstrates policy-driven AI workflows, safe automation, and testable behavior under failure and retry conditions.
+- Analyze an existing vault folder and generate action-tiered proposals
+- Auto-apply safe changes while keeping risky changes in review
+- Propose/apply note links with confidence controls and anti-spam guards
+- Run daily triage and weekly deep review from Obsidian command palette
+- Publish drafts through stage-aware quality gates (`seed`, `sprout`, `tree`)
+- Route failed publish attempts to a revision queue with explicit reasons
 
 ---
 
@@ -28,54 +24,54 @@ This project is intentionally built to be both useful and portfolio-ready: it de
 ```mermaid
 mindmap
   root((Mind Lite))
-    Onboarding
+    Obsidian Commands
       Analyze Folder
-      Batch Run State
-      Proposal Generation
-    Organization
-      PARA Classification
-      Low Risk Auto Apply
-      Medium/High Review
-    Graph
-      Link Proposals
-      Confidence Filtering
-      Anti Spam Controls
-    Safety
-      Snapshot + Rollback
+      Review and Apply
+      Rollback
+      Propose and Apply Links
+      Publish to GOM
+    API Layer
+      Run Lifecycle
+      Action Tiering
+      Snapshot and Rollback
       Idempotency Replay
-      Audit Trail
-      Run Lifecycle Rules
-    Routing
-      Local First
+    LLM Workloads
+      PARA Classification
+      Link Scoring
+      Local LM Studio Calls
+    Policy Gates
       Sensitivity Gate
       Budget Guardrails
-      Controlled Cloud Fallback
+      Routing Policy
+      Editorial Gate by Stage
     Publishing
-      Prepare Draft
-      Score by Stage
-      Hard Fail Diagnostics
+      Prepare
+      Score
       Pass to GOM Queue
       Fail to Revision Queue
-    Obsidian Plugin
-      Command Palette UX
-      Review Modals
-      Daily and Weekly Flows
-      Publish Wizard
 ```
 
 ---
 
-## Core Guarantees
+## Engineering Stack and Design Choices
 
-- **Local-first by default:** model routing prefers local runtime
-- **Policy before action:** sensitivity + budget + lifecycle checks gate execution
-- **Human control for risky changes:** structural edits are not silently forced
-- **Reversible operations:** snapshot + rollback support for apply flows
-- **Editorial quality gate:** publish is blocked unless stage threshold and hard-fail rules pass
+- **Backend:** Python 3.10+, `http.server`-based local API, contract-oriented service logic
+- **Plugin:** TypeScript Obsidian plugin (command-first, modal-driven UX)
+- **Transport:** JSON-over-HTTP across plugin and API
+- **Reliability:** run lifecycle validation, idempotency replay ledgers, snapshot/rollback semantics
+- **Policy model:** explicit modules for routing, sensitivity, budget, and publish-gate enforcement
+- **Testing:** backend `unittest` suite + plugin command/flow tests via Node scripts
+
+Key implementation anchors:
+
+- `src/mind_lite/api/service.py`
+- `src/mind_lite/api/http_server.py`
+- `obsidian-plugin/src/main.ts`
+- `obsidian-plugin/src/features/publish/gom-flow.ts`
 
 ---
 
-## Quick Start
+## Install and Configure
 
 ### 1) Clone and install backend
 
@@ -87,25 +83,25 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Optional dev tools:
+Optional dev dependencies:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-### 2) Start API server
+### 2) Run the API
 
 ```bash
 PYTHONPATH=src python3 -m mind_lite.api
 ```
 
-Expected:
+Expected log:
 
 ```text
 Mind Lite API listening on http://127.0.0.1:8000
 ```
 
-### 3) Build Obsidian plugin
+### 3) Build and install Obsidian plugin
 
 ```bash
 cd obsidian-plugin
@@ -113,46 +109,75 @@ npm install
 npm run build
 ```
 
-### 4) Install plugin into your vault
-
-Copy these files to:
-
-`<your-vault>/.obsidian/plugins/mind-lite/`
+Copy into your vault plugin folder:
 
 - `obsidian-plugin/main.js`
 - `obsidian-plugin/manifest.json`
 - `obsidian-plugin/styles.css`
 
-Then enable the plugin in Obsidian Community Plugins.
+Destination:
+
+- `<your-vault>/.obsidian/plugins/mind-lite/`
+
+Then enable **Mind Lite** in Obsidian Community Plugins.
 
 ---
 
-## Plugin Commands
+## LLM Setup (Implemented Today)
 
-- `Mind Lite: Analyze Folder`
-- `Mind Lite: Review Proposals`
-- `Mind Lite: Apply Approved`
-- `Mind Lite: Rollback Last Batch`
-- `Mind Lite: Propose Links`
-- `Mind Lite: Apply Links`
-- `Mind Lite: Daily Triage`
-- `Mind Lite: Weekly Deep Review`
-- `Mind Lite: Publish to GOM`
+Mind Lite currently uses an OpenAI-compatible local endpoint for LLM tasks (classification/link scoring).
+
+### Local LLM with LM Studio
+
+1. Start LM Studio local server
+2. Ensure endpoint is available at:
+   - `http://localhost:1234/v1/chat/completions`
+3. Load any model in LM Studio and keep server running
+
+Mind Lite calls this endpoint for:
+
+- PARA classification (`organize/classify_llm.py`)
+- Link scoring (`links/propose_llm.py`)
+
+### External provider note
+
+Routing policies include cloud fallback concepts (for example `openai` routing decisions), but this repository currently documents and supports the local LM Studio path as the concrete setup flow.
 
 ---
 
-## Manual Test Pass Guide
+## Human Example: First Real Session
 
-Use the full step-by-step manual here:
+Imagine you have a folder `Projects/Atlas` with mixed notes, weak tags, and broken linking.
+
+1. Open command palette -> `Mind Lite: Analyze Folder`
+   - input: `Projects/Atlas`
+   - result: run id + state returned in modal
+
+2. Run `Mind Lite: Review Proposals`
+   - inspect grouped proposals by status/risk
+
+3. Run `Mind Lite: Apply Approved`
+   - safe approved changes apply
+
+4. Run `Mind Lite: Propose Links`
+   - enter source note id and candidate note ids
+   - review sorted suggestions by confidence
+
+5. Run `Mind Lite: Apply Links`
+   - optionally set minimum confidence (for example `0.70`)
+
+6. Run `Mind Lite: Publish to GOM`
+   - enter draft data + stage (`seed`, `sprout`, or `tree`)
+   - if gate passes -> draft is queued for GOM
+   - if gate fails -> draft is routed to revision queue with hard-fail reasons and recommended actions
+
+---
+
+## Full Manual Test Pass
+
+For complete installation, command-by-command manual QA, and acceptance criteria:
 
 - `docs/MANUAL_TEST_PASS.md`
-
-It includes:
-
-- installation checklist
-- end-to-end command walkthrough
-- publish gate pass/fail scenarios
-- expected outputs and acceptance criteria
 
 ---
 
@@ -173,31 +198,9 @@ npm run verify
 
 ---
 
-## Technical Snapshot
+## Documentation Map
 
-- API service: `src/mind_lite/api/service.py`
-- HTTP routing: `src/mind_lite/api/http_server.py`
-- Obsidian plugin entry: `obsidian-plugin/src/main.ts`
-- Publish flow client logic: `obsidian-plugin/src/features/publish/gom-flow.ts`
-- API contracts and examples: `API.md`
-- Architecture boundaries: `ARCHITECTURE.md`
-- Capability roadmap: `ROADMAP.md`
-
----
-
-## Portfolio Framing
-
-Mind Lite demonstrates:
-
-- policy-based AI system design
-- reliable stateful workflow execution
-- idempotent/replay-safe endpoint behavior
-- reversible automation with human review boundaries
-- product-facing UX over strict backend contracts
-
-If you are evaluating this project as an engineering portfolio, start with:
-
-1. `README.md`
-2. `docs/MANUAL_TEST_PASS.md`
-3. `API.md`
-4. `ARCHITECTURE.md`
+- `API.md` - endpoint contracts and payload examples
+- `ARCHITECTURE.md` - component boundaries and system behavior
+- `ROADMAP.md` - capability progression
+- `docs/MANUAL_TEST_PASS.md` - full manual testing guide
