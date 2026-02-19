@@ -23,11 +23,11 @@ async function request<TResponse extends JSONValue>(
     body: body ? JSON.stringify(body) : undefined
   });
 
-  const json = (await response.json()) as TResponse;
-
   if (!response.ok) {
     throw new APIError(response.status);
   }
+
+  const json = (await response.json()) as TResponse;
 
   return json;
 }

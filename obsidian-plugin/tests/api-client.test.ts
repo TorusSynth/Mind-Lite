@@ -47,6 +47,34 @@ async function run() {
       assert.equal(error.status, 503);
       return true;
     });
+
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError("Unexpected token < in JSON at position 0");
+      }
+    });
+
+    await assert.rejects(apiGet("/health"), (error) => {
+      assert.ok(error instanceof APIError);
+      assert.equal(error.status, 502);
+      return true;
+    });
+
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 500,
+      json: async () => {
+        throw new SyntaxError("Unexpected end of JSON input");
+      }
+    });
+
+    await assert.rejects(apiGet("/health"), (error) => {
+      assert.ok(error instanceof APIError);
+      assert.equal(error.status, 500);
+      return true;
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
