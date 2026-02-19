@@ -2,9 +2,8 @@
   "name": "obsidian-plugin",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node -e \"require('node:fs').copyFileSync('dist/main.js', 'main.js')\"",
     "dev": "tsc -w -p tsconfig.json",
     "test": "node tests/smoke.test.ts"
   },
