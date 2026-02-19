@@ -1122,22 +1122,49 @@ class ApiServiceTests(unittest.TestCase):
             {
                 "draft_id": "draft_001",
                 "content": "This is a clear project update with concrete outcomes and next steps." * 4,
+                "stage": "seed",
             }
         )
 
         self.assertEqual(result["draft_id"], "draft_001")
         self.assertIn("scores", result)
         self.assertIn("overall", result["scores"])
+        self.assertEqual(result["threshold"], 0.70)
         self.assertTrue(result["gate_passed"])
 
     def test_publish_score_blocks_weak_draft(self):
         service = ApiService()
 
-        result = service.publish_score({"draft_id": "draft_002", "content": "TODO"})
+        result = service.publish_score({"draft_id": "draft_002", "content": "TODO", "stage": "seed"})
 
         self.assertEqual(result["draft_id"], "draft_002")
         self.assertFalse(result["gate_passed"])
         self.assertLess(result["scores"]["overall"], 0.8)
+
+    def test_publish_score_uses_stage_thresholds(self):
+        service = ApiService()
+        content = ("word " * 41 + "word.").strip()
+
+        seed = service.publish_score({"draft_id": "d1", "content": content, "stage": "seed"})
+        sprout = service.publish_score({"draft_id": "d1", "content": content, "stage": "sprout"})
+        tree = service.publish_score({"draft_id": "d1", "content": content, "stage": "tree"})
+
+        self.assertEqual(seed["scores"]["overall"], 0.8)
+        self.assertEqual(seed["threshold"], 0.70)
+        self.assertEqual(sprout["threshold"], 0.80)
+        self.assertEqual(tree["threshold"], 0.90)
+        self.assertTrue(seed["gate_passed"])
+        self.assertTrue(sprout["gate_passed"])
+        self.assertFalse(tree["gate_passed"])
+
+    def test_publish_score_requires_valid_stage(self):
+        service = ApiService()
+
+        with self.assertRaisesRegex(ValueError, "stage"):
+            service.publish_score({"draft_id": "d1", "content": "valid content without TODO"})
+
+        with self.assertRaisesRegex(ValueError, "stage"):
+            service.publish_score({"draft_id": "d1", "content": "valid content without TODO", "stage": "sapling"})
 
     def test_publish_prepare_returns_sanitized_draft_payload(self):
         service = ApiService()

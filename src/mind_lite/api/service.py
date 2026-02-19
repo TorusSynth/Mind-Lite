@@ -568,6 +568,19 @@ class ApiService:
         if not isinstance(content, str) or not content.strip():
             raise ValueError("content is required")
 
+        stage = payload.get("stage")
+        if not isinstance(stage, str) or not stage.strip():
+            raise ValueError("stage is required")
+        normalized_stage = stage.strip()
+        thresholds = {
+            "seed": 0.70,
+            "sprout": 0.80,
+            "tree": 0.90,
+        }
+        threshold = thresholds.get(normalized_stage)
+        if threshold is None:
+            raise ValueError("stage must be one of: seed, sprout, tree")
+
         normalized = content.strip()
         word_count = len(normalized.split())
         has_todo = "todo" in normalized.lower()
@@ -584,13 +597,15 @@ class ApiService:
 
         return {
             "draft_id": draft_id.strip(),
+            "stage": normalized_stage,
+            "threshold": threshold,
             "scores": {
                 "structure": round(structure, 2),
                 "clarity": round(clarity, 2),
                 "safety": round(safety, 2),
                 "overall": overall,
             },
-            "gate_passed": overall >= 0.80,
+            "gate_passed": overall >= threshold,
         }
 
     def publish_prepare(self, payload: dict) -> dict:
