@@ -4,6 +4,7 @@ import { ReviewModal } from "./features/organize/modals/ReviewModal";
 import { registerAnalyzeFolderCommand } from "./features/onboarding/analyze-folder";
 import { getLastRunId } from "./features/runs/history";
 import { RollbackModal } from "./features/runs/modals/RollbackModal";
+import { createErrorText } from "./modals/base";
 
 export default class MindLitePlugin extends Plugin {
   async onload(): Promise<void> {
@@ -35,8 +36,12 @@ export default class MindLitePlugin extends Plugin {
           return;
         }
 
-        await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/apply`, {});
-        new Notice("Mind Lite applied approved proposals.");
+        try {
+          await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/apply`, {});
+          new Notice("Mind Lite applied approved proposals.");
+        } catch (error) {
+          new Notice(createErrorText(error));
+        }
       }
     });
 

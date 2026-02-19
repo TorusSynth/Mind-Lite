@@ -170,7 +170,7 @@ async function run() {
   globalThis.document = createDocument();
 
   try {
-    const { setLastRunId, clearLastRunId } = require(historyPath);
+    const { setLastRunId, getLastRunId, clearLastRunId } = require(historyPath);
     const mainModule = require(mainPath);
     const MindLitePlugin = mainModule.default;
 
@@ -183,6 +183,8 @@ async function run() {
     assert.ok(commandIds.includes("mind-lite-rollback-last-batch"));
 
     clearLastRunId();
+    setLastRunId({ bad: true });
+    assert.equal(getLastRunId(), null);
     noticeMessages.length = 0;
     await plugin.commands.find((command) => command.id === "mind-lite-review-proposals").callback();
     assert.deepEqual(noticeMessages, ["Mind Lite has no recent run to review."]);
@@ -232,6 +234,33 @@ async function run() {
       url: "http://localhost:8000/runs/run-42/apply",
       method: "POST"
     });
+
+    fetchCalls = [];
+    noticeMessages.length = 0;
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, method: init?.method });
+
+      if (url.endsWith("/apply")) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({})
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({})
+      };
+    };
+
+    await plugin.commands.find((command) => command.id === "mind-lite-apply-approved").callback();
+    assert.deepEqual(fetchCalls[0], {
+      url: "http://localhost:8000/runs/run-42/apply",
+      method: "POST"
+    });
+    assert.deepEqual(noticeMessages, ["API request failed with status 500"]);
 
     fetchCalls = [];
     openedModals.length = 0;

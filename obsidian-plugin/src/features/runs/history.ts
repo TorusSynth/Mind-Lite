@@ -1,6 +1,11 @@
 let lastRunId: string | null = null;
 
-export function setLastRunId(runId: string): void {
+export function setLastRunId(runId: unknown): void {
+  if (typeof runId !== "string") {
+    lastRunId = null;
+    return;
+  }
+
   const value = runId.trim();
   lastRunId = value.length > 0 ? value : null;
 }
