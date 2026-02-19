@@ -1399,20 +1399,31 @@ class ApiServiceTests(unittest.TestCase):
     def test_links_propose_returns_scored_suggestions(self):
         service = ApiService()
 
-        result = service.links_propose(
-            {
-                "source_note_id": "n1",
-                "candidate_notes": [
-                    {"note_id": "n2", "title": "Atlas Architecture"},
-                    {"note_id": "n3", "title": "Random Grocery List"},
-                ],
-            }
-        )
+        def mock_score(source, candidates):
+            return [
+                {"target_note_id": "n2", "confidence": 0.88, "reason": "shared_project_context"},
+                {"target_note_id": "n3", "confidence": 0.72, "reason": "semantic_similarity"},
+            ]
+        import mind_lite.links.propose_llm
+        original = mind_lite.links.propose_llm.score_links
+        mind_lite.links.propose_llm.score_links = mock_score
+        try:
+            result = service.links_propose(
+                {
+                    "source_note_id": "n1",
+                    "candidate_notes": [
+                        {"note_id": "n2", "title": "Atlas Architecture"},
+                        {"note_id": "n3", "title": "Random Grocery List"},
+                    ],
+                }
+            )
 
-        self.assertEqual(result["source_note_id"], "n1")
-        self.assertEqual(len(result["suggestions"]), 2)
-        self.assertEqual(result["suggestions"][0]["target_note_id"], "n2")
-        self.assertGreater(result["suggestions"][0]["confidence"], result["suggestions"][1]["confidence"])
+            self.assertEqual(result["source_note_id"], "n1")
+            self.assertEqual(len(result["suggestions"]), 2)
+            self.assertEqual(result["suggestions"][0]["target_note_id"], "n2")
+            self.assertGreater(result["suggestions"][0]["confidence"], result["suggestions"][1]["confidence"])
+        finally:
+            mind_lite.links.propose_llm.score_links = original
 
     def test_links_propose_requires_source_and_candidates(self):
         service = ApiService()

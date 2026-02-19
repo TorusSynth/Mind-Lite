@@ -13,6 +13,25 @@ from mind_lite.api.http_server import create_server
 
 class HttpServerTests(unittest.TestCase):
     def setUp(self):
+        def mock_classify(note):
+            title = note.get("title", "").lower()
+            if "project" in title or "atlas" in title:
+                return {"primary": "project", "secondary": [], "confidence": 0.86}
+            return {"primary": "resource", "secondary": [], "confidence": 0.79}
+
+        def mock_score(source, candidates):
+            return [
+                {"target_note_id": "n2", "confidence": 0.88, "reason": "shared_project_context"},
+                {"target_note_id": "n3", "confidence": 0.72, "reason": "semantic_similarity"},
+            ]
+
+        import mind_lite.organize.classify_llm
+        import mind_lite.links.propose_llm
+        self._orig_classify = mind_lite.organize.classify_llm.classify_note
+        self._orig_score = mind_lite.links.propose_llm.score_links
+        mind_lite.organize.classify_llm.classify_note = mock_classify
+        mind_lite.links.propose_llm.score_links = mock_score
+
         self.server = create_server(host="127.0.0.1", port=0)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -20,6 +39,11 @@ class HttpServerTests(unittest.TestCase):
         self.host, self.port = self.server.server_address
 
     def tearDown(self):
+        import mind_lite.organize.classify_llm
+        import mind_lite.links.propose_llm
+        mind_lite.organize.classify_llm.classify_note = self._orig_classify
+        mind_lite.links.propose_llm.score_links = self._orig_score
+
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=1)
@@ -1644,7 +1668,7 @@ class HttpServerTests(unittest.TestCase):
         conn.request(
             "POST",
             "/organize/classify",
-            body=json.dumps({"notes": [{"note_id": "n1"}]}),
+            body=json.dumps({"notes": [{}]}),
             headers={"Content-Type": "application/json"},
         )
         resp = conn.getresponse()
