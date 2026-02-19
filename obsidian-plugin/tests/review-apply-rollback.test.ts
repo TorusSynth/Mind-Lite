@@ -246,6 +246,37 @@ async function run() {
     globalThis.fetch = async (url, init) => {
       fetchCalls.push({ url, method: init?.method });
 
+      if (url.endsWith("/approve")) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({})
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({})
+      };
+    };
+
+    await plugin.commands.find((command) => command.id === "mind-lite-apply-approved").callback();
+    assert.deepEqual(fetchCalls[0], {
+      url: "http://localhost:8000/runs/run-42/approve",
+      method: "POST"
+    });
+    assert.deepEqual(fetchCalls[1], {
+      url: "http://localhost:8000/runs/run-42/apply",
+      method: "POST"
+    });
+    assert.deepEqual(noticeMessages, ["Mind Lite approved and applied proposals."]);
+
+    fetchCalls = [];
+    noticeMessages.length = 0;
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, method: init?.method });
+
       if (url.endsWith("/apply")) {
         return {
           ok: false,

@@ -89,11 +89,16 @@ export default class MindLitePlugin extends Plugin {
         }
 
         try {
-          await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/approve`, {});
+          try {
+            await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/approve`, {});
+          } catch {
+            // Allow apply retries when approval already happened.
+          }
+
           await apiPost<Record<string, never>, Record<string, never>>(`/runs/${runId}/apply`, {});
           new Notice("Mind Lite approved and applied proposals.");
-        } catch (error) {
-          new Notice(createErrorText(error));
+        } catch (applyError) {
+          new Notice(createErrorText(applyError));
         }
       }
     });
