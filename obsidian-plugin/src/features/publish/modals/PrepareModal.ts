@@ -1,12 +1,13 @@
 import { App, Modal } from "obsidian";
-import type { PublishPreparePayload } from "../gom-flow";
+import { normalizePublishStage, type PublishPreparePayload, type PublishStage } from "../gom-flow";
 
-type OnContinue = () => void | Promise<void>;
+type OnContinue = (stage: PublishStage) => void | Promise<void>;
 
 export class PrepareModal extends Modal {
   private readonly payload: PublishPreparePayload;
   private readonly preparedContent: string;
   private readonly sanitized: boolean;
+  private readonly initialStage: PublishStage;
   private readonly onContinue: OnContinue;
 
   constructor(
@@ -14,12 +15,14 @@ export class PrepareModal extends Modal {
     payload: PublishPreparePayload,
     preparedContent: string,
     sanitized: boolean,
+    initialStage: PublishStage,
     onContinue: OnContinue
   ) {
     super(app);
     this.payload = payload;
     this.preparedContent = preparedContent;
     this.sanitized = sanitized;
+    this.initialStage = initialStage;
     this.onContinue = onContinue;
   }
 
@@ -49,11 +52,21 @@ export class PrepareModal extends Modal {
     previewEl.textContent = this.preparedContent;
     contentEl.appendChild(previewEl);
 
+    const stageLabelEl = document.createElement("p");
+    stageLabelEl.textContent = "Stage (seed|sprout|tree):";
+    contentEl.appendChild(stageLabelEl);
+
+    const stageInputEl = document.createElement("input");
+    stageInputEl.type = "text";
+    stageInputEl.value = this.initialStage;
+    stageInputEl.placeholder = "seed";
+    contentEl.appendChild(stageInputEl);
+
     const continueButtonEl = document.createElement("button");
     continueButtonEl.type = "button";
     continueButtonEl.textContent = "Continue";
     continueButtonEl.onclick = () => {
-      void this.onContinue();
+      void this.onContinue(normalizePublishStage(stageInputEl.value));
       this.close();
     };
     contentEl.appendChild(continueButtonEl);

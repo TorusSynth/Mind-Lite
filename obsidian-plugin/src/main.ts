@@ -13,7 +13,7 @@ import { analyzeFolder } from "./features/onboarding/analyze-folder";
 import { RunStatusModal } from "./features/onboarding/modals/RunStatusModal";
 import { ReviewModal } from "./features/organize/modals/ReviewModal";
 import { registerAnalyzeFolderCommand } from "./features/onboarding/analyze-folder";
-import { prepareDraftForGom, runGomGateFlow } from "./features/publish/gom-flow";
+import { normalizePublishStage, prepareDraftForGom, runGomGateFlow } from "./features/publish/gom-flow";
 import { GateResultsModal } from "./features/publish/modals/GateResultsModal";
 import { PrepareModal } from "./features/publish/modals/PrepareModal";
 import { getLastRunId, setLastRunId } from "./features/runs/history";
@@ -230,6 +230,8 @@ export default class MindLitePlugin extends Plugin {
 
         const target = prompt?.("Target", "gom") ?? "gom";
         const normalizedTarget = target.trim().length > 0 ? target.trim() : "gom";
+        const rawStage = prompt?.("Stage (seed|sprout|tree)", "seed") ?? "seed";
+        const stage = normalizePublishStage(rawStage);
 
         try {
           const payload = {
@@ -238,8 +240,8 @@ export default class MindLitePlugin extends Plugin {
             target: normalizedTarget
           };
           const prepared = await prepareDraftForGom(payload);
-          new PrepareModal(this.app, payload, prepared.prepared_content, prepared.sanitized === true, async () => {
-            const flowResult = await runGomGateFlow(prepared);
+          new PrepareModal(this.app, payload, prepared.prepared_content, prepared.sanitized === true, stage, async (selectedStage) => {
+            const flowResult = await runGomGateFlow(prepared, selectedStage);
             new GateResultsModal(this.app, flowResult).open();
           }).open();
         } catch (error) {

@@ -23,10 +23,26 @@ export class GateResultsModal extends Modal {
     gateEl.textContent = `Gate passed: ${this.result.gatePassed ? "yes" : "no"}`;
     contentEl.appendChild(gateEl);
 
+    const stageEl = document.createElement("p");
+    stageEl.textContent = `Stage: ${this.result.stage}`;
+    contentEl.appendChild(stageEl);
+
     if (this.result.markStatus != null) {
       const markEl = document.createElement("p");
       markEl.textContent = `Mark status: ${this.result.markStatus}`;
       contentEl.appendChild(markEl);
+    }
+
+    if (this.result.hardFailReasons.length > 0) {
+      const reasonsEl = document.createElement("p");
+      reasonsEl.textContent = `Hard fail reasons: ${this.result.hardFailReasons.join(", ")}`;
+      contentEl.appendChild(reasonsEl);
+    }
+
+    if (this.result.recommendedActions.length > 0) {
+      const actionsEl = document.createElement("p");
+      actionsEl.textContent = `Recommended actions: ${this.result.recommendedActions.join(", ")}`;
+      contentEl.appendChild(actionsEl);
     }
 
     const diagnosticsTitleEl = document.createElement("p");

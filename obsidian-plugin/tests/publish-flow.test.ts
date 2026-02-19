@@ -247,9 +247,11 @@ async function run() {
       "draft-pass",
       "# Weekly Update\n\nConcrete outcomes and next steps.",
       "gom",
+      "sprout",
       "draft-fail",
       "todo",
-      "gom"
+      "gom",
+      "invalid-stage"
     ];
     globalThis.prompt = (message) => {
       promptCalls.push(message);
@@ -278,7 +280,7 @@ async function run() {
     assert.ok(gatePassModal);
     assert.equal(gatePassModal.title, "Mind Lite: GOM Gate Results");
     assert.deepEqual(collectTextsByTag(gatePassModal.contentEl, "li"), [
-      "prepare: ok - target=gom, sanitized=yes",
+      "prepare: ok - target=gom, stage=sprout, sanitized=yes",
       "score: ok - overall=0.92, gate_passed=true",
       "mark-for-gom: ok - queued_for_gom"
     ]);
@@ -293,10 +295,12 @@ async function run() {
     const gateFailModal = openedModals.at(-1);
     assert.ok(gateFailModal);
     assert.deepEqual(collectTextsByTag(gateFailModal.contentEl, "li"), [
-      "prepare: ok - target=gom, sanitized=yes",
+      "prepare: ok - target=gom, stage=seed, sanitized=yes",
       "score: ok - overall=0.45, gate_passed=false",
       "mark-for-revision: ok - queued_for_revision"
     ]);
+    assert.ok(collectTextsByTag(gateFailModal.contentEl, "p").includes("Hard fail reasons: missing_citation"));
+    assert.ok(collectTextsByTag(gateFailModal.contentEl, "p").includes("Recommended actions: add_source_links"));
 
     assert.deepEqual(fetchCalls[0], {
       url: "http://localhost:8000/publish/prepare",
@@ -313,7 +317,7 @@ async function run() {
       body: {
         draft_id: "draft-pass",
         content: "# Weekly Update\n\nConcrete outcomes and next steps.",
-        stage: "seed"
+        stage: "sprout"
       }
     });
     assert.deepEqual(fetchCalls[2], {
@@ -363,9 +367,11 @@ async function run() {
       "Draft id",
       "Content",
       "Target",
+      "Stage (seed|sprout|tree)",
       "Draft id",
       "Content",
-      "Target"
+      "Target",
+      "Stage (seed|sprout|tree)"
     ]);
 
     console.log("GOM publish flow command test passed");

@@ -7,6 +7,8 @@ export type PublishPreparePayload = {
   target: string;
 };
 
+export type PublishStage = "seed" | "sprout" | "tree";
+
 type PublishPrepareResponse = {
   draft_id: string;
   target: string;
@@ -23,6 +25,8 @@ type PublishScoreResponse = {
     overall?: number;
   };
   gate_passed: boolean;
+  hard_fail_reasons?: string[];
+  recommended_actions?: string[];
 };
 
 type PublishMarkResponse = {
@@ -31,7 +35,7 @@ type PublishMarkResponse = {
 };
 
 export type GateStageDiagnostic = {
-  stage: "prepare" | "score" | "mark-for-gom";
+  stage: "prepare" | "score" | "mark-for-gom" | "mark-for-revision";
   ok: boolean;
   detail: string;
 };
@@ -40,10 +44,22 @@ export type GomPublishFlowResult = {
   draftId: string;
   target: string;
   preparedContent: string;
+  stage: PublishStage;
   gatePassed: boolean;
   markStatus: string | null;
+  hardFailReasons: string[];
+  recommendedActions: string[];
   diagnostics: GateStageDiagnostic[];
 };
+
+export function normalizePublishStage(rawStage: string | null | undefined): PublishStage {
+  const normalized = rawStage?.trim().toLowerCase();
+  if (normalized === "sprout" || normalized === "tree") {
+    return normalized;
+  }
+
+  return "seed";
+}
 
 function deriveTitle(preparedContent: string, draftId: string): string {
   for (const line of preparedContent.split("\n")) {
@@ -64,22 +80,26 @@ export async function prepareDraftForGom(payload: PublishPreparePayload): Promis
 }
 
 export async function runGomGateFlow(
-  prepared: PublishPrepareResponse
+  prepared: PublishPrepareResponse,
+  stage: PublishStage
 ): Promise<GomPublishFlowResult> {
   const diagnostics: GateStageDiagnostic[] = [];
   diagnostics.push({
     stage: "prepare",
     ok: true,
-    detail: `target=${prepared.target}, sanitized=${prepared.sanitized === true ? "yes" : "no"}`
+    detail: `target=${prepared.target}, stage=${stage}, sanitized=${prepared.sanitized === true ? "yes" : "no"}`
   });
 
   let scoreResult: PublishScoreResponse;
   try {
-    scoreResult = await apiPost<{ draft_id: string; content: string; stage: "seed" }, PublishScoreResponse>("/publish/score", {
-      draft_id: prepared.draft_id,
-      content: prepared.prepared_content,
-      stage: "seed"
-    });
+    scoreResult = await apiPost<{ draft_id: string; content: string; stage: PublishStage }, PublishScoreResponse>(
+      "/publish/score",
+      {
+        draft_id: prepared.draft_id,
+        content: prepared.prepared_content,
+        stage
+      }
+    );
   } catch (error) {
     diagnostics.push({
       stage: "score",
@@ -91,11 +111,17 @@ export async function runGomGateFlow(
       draftId: prepared.draft_id,
       target: prepared.target,
       preparedContent: prepared.prepared_content,
+      stage,
       gatePassed: false,
       markStatus: null,
+      hardFailReasons: [],
+      recommendedActions: [],
       diagnostics
     };
   }
+
+  const hardFailReasons = scoreResult.hard_fail_reasons ?? [];
+  const recommendedActions = scoreResult.recommended_actions ?? [];
 
   const overall = scoreResult.scores?.overall;
   diagnostics.push({
@@ -105,20 +131,61 @@ export async function runGomGateFlow(
   });
 
   if (!scoreResult.gate_passed) {
-    diagnostics.push({
-      stage: "mark-for-gom",
-      ok: false,
-      detail: "Skipped because gate did not pass"
-    });
+    try {
+      const markRevisionResult = await apiPost<
+        {
+          draft_id: string;
+          title: string;
+          prepared_content: string;
+          hard_fail_reasons: string[];
+          recommended_actions: string[];
+        },
+        PublishMarkResponse
+      >("/publish/mark-for-revision", {
+        draft_id: prepared.draft_id,
+        title: deriveTitle(prepared.prepared_content, prepared.draft_id),
+        prepared_content: prepared.prepared_content,
+        hard_fail_reasons: hardFailReasons,
+        recommended_actions: recommendedActions
+      });
 
-    return {
-      draftId: prepared.draft_id,
-      target: prepared.target,
-      preparedContent: prepared.prepared_content,
-      gatePassed: false,
-      markStatus: null,
-      diagnostics
-    };
+      diagnostics.push({
+        stage: "mark-for-revision",
+        ok: true,
+        detail: markRevisionResult.status ?? "queued_for_revision"
+      });
+
+      return {
+        draftId: prepared.draft_id,
+        target: prepared.target,
+        preparedContent: prepared.prepared_content,
+        stage,
+        gatePassed: false,
+        markStatus: markRevisionResult.status ?? null,
+        hardFailReasons,
+        recommendedActions,
+        diagnostics
+      };
+    } catch (error) {
+      diagnostics.push({
+        stage: "mark-for-revision",
+        ok: false,
+        detail: createErrorText(error)
+      });
+
+      return {
+        draftId: prepared.draft_id,
+        target: prepared.target,
+        preparedContent: prepared.prepared_content,
+        stage,
+        gatePassed: false,
+        markStatus: null,
+        hardFailReasons,
+        recommendedActions,
+        diagnostics
+      };
+    }
+
   }
 
   try {
@@ -141,8 +208,11 @@ export async function runGomGateFlow(
       draftId: prepared.draft_id,
       target: prepared.target,
       preparedContent: prepared.prepared_content,
+      stage,
       gatePassed: true,
       markStatus: markResult.status ?? null,
+      hardFailReasons,
+      recommendedActions,
       diagnostics
     };
   } catch (error) {
@@ -156,8 +226,11 @@ export async function runGomGateFlow(
       draftId: prepared.draft_id,
       target: prepared.target,
       preparedContent: prepared.prepared_content,
+      stage,
       gatePassed: true,
       markStatus: null,
+      hardFailReasons,
+      recommendedActions,
       diagnostics
     };
   }
