@@ -41,9 +41,9 @@ export class LinksReviewModal extends Modal {
 
     for (const proposal of this.proposals) {
       const itemEl = document.createElement("li");
-      const source = asLabelPart(proposal.source, "(unknown)");
-      const target = asLabelPart(proposal.target, "(unknown)");
-      itemEl.textContent = `${source} -> ${target} (${formatConfidence(proposal.confidence)})`;
+      const target = asLabelPart(proposal.target_note_id, "(unknown)");
+      const reason = asLabelPart(proposal.reason, "unspecified_reason");
+      itemEl.textContent = `${target} (${formatConfidence(proposal.confidence)}) - ${reason}`;
       listEl.appendChild(itemEl);
     }
 

@@ -1,7 +1,14 @@
 import { Notice, Plugin } from "obsidian";
 import { apiPost } from "./api/client";
 import { LinksReviewModal } from "./features/links/modals/LinksReviewModal";
-import { applyLinks, parseMinimumConfidence, proposeLinks } from "./features/links/propose-links";
+import {
+  applyLinks,
+  parseCandidateNoteIds,
+  parseMinimumConfidence,
+  parseSourceNoteId,
+  proposeLinks,
+  type LinkProposal
+} from "./features/links/propose-links";
 import { ReviewModal } from "./features/organize/modals/ReviewModal";
 import { registerAnalyzeFolderCommand } from "./features/onboarding/analyze-folder";
 import { getLastRunId } from "./features/runs/history";
@@ -15,6 +22,9 @@ function getPromptFn(): PromptFn | undefined {
 }
 
 export default class MindLitePlugin extends Plugin {
+  private lastLinkSourceNoteId: string | null = null;
+  private lastLinkSuggestions: LinkProposal[] = [];
+
   async onload(): Promise<void> {
     registerAnalyzeFolderCommand(this);
 
@@ -74,9 +84,24 @@ export default class MindLitePlugin extends Plugin {
       id: "mind-lite-propose-links",
       name: "Mind Lite: Propose Links",
       callback: async () => {
+        const prompt = getPromptFn();
+        const rawSourceNoteId = prompt?.("Source note id", "");
+        if (rawSourceNoteId == null) {
+          return;
+        }
+
+        const rawCandidateNoteIds = prompt?.("Candidate note ids (comma-separated)", "");
+        if (rawCandidateNoteIds == null) {
+          return;
+        }
+
         try {
-          const proposals = await proposeLinks();
-          new LinksReviewModal(this.app, proposals).open();
+          const sourceNoteId = parseSourceNoteId(rawSourceNoteId);
+          const candidateNotes = parseCandidateNoteIds(rawCandidateNoteIds);
+          const result = await proposeLinks(sourceNoteId, candidateNotes);
+          this.lastLinkSourceNoteId = result.sourceNoteId;
+          this.lastLinkSuggestions = result.suggestions;
+          new LinksReviewModal(this.app, result.suggestions).open();
         } catch (error) {
           new Notice(createErrorText(error));
         }
@@ -87,6 +112,11 @@ export default class MindLitePlugin extends Plugin {
       id: "mind-lite-apply-links",
       name: "Mind Lite: Apply Links",
       callback: async () => {
+        if (this.lastLinkSourceNoteId == null || this.lastLinkSuggestions.length === 0) {
+          new Notice("Propose links first to collect suggestions.");
+          return;
+        }
+
         const prompt = getPromptFn();
         const rawMinimumConfidence = prompt?.("Minimum confidence (0-1, optional)", "");
 
@@ -96,7 +126,7 @@ export default class MindLitePlugin extends Plugin {
 
         try {
           const minimumConfidence = parseMinimumConfidence(rawMinimumConfidence);
-          await applyLinks(minimumConfidence);
+          await applyLinks(this.lastLinkSourceNoteId, this.lastLinkSuggestions, minimumConfidence);
           new Notice("Mind Lite applied links.");
         } catch (error) {
           new Notice(createErrorText(error));

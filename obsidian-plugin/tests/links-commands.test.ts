@@ -162,6 +162,8 @@ async function run() {
     assert.ok(commandIds.includes("mind-lite-apply-links"));
 
     const fetchCalls = [];
+    const promptCalls = [];
+    const promptResponses = ["source-note", "candidate-z, candidate-a, candidate-b", "0.72"];
     globalThis.fetch = async (url, init) => {
       const body = init?.body == null ? undefined : JSON.parse(init.body);
       fetchCalls.push({ url, method: init?.method, body });
@@ -170,11 +172,14 @@ async function run() {
         return {
           ok: true,
           status: 200,
-          json: async () => ([
-            { source: "delta", target: "epsilon", confidence: 0.33 },
-            { source: "alpha", target: "beta", confidence: 0.95 },
-            { source: "alpha", target: "gamma", confidence: 0.72 }
-          ])
+          json: async () => ({
+            source_note_id: "source-note",
+            suggestions: [
+              { target_note_id: "candidate-z", confidence: 0.33, reason: "weak_similarity" },
+              { target_note_id: "candidate-a", confidence: 0.95, reason: "shared_project_context" },
+              { target_note_id: "candidate-b", confidence: 0.72, reason: "semantic_similarity" }
+            ]
+          })
         };
       }
 
@@ -185,31 +190,56 @@ async function run() {
       };
     };
 
+    globalThis.prompt = (message) => {
+      promptCalls.push(message);
+      return promptResponses.shift() ?? null;
+    };
+
     await plugin.commands.find((command) => command.id === "mind-lite-propose-links").callback();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     assert.deepEqual(fetchCalls[0], {
       url: "http://localhost:8000/links/propose",
       method: "POST",
-      body: {}
+      body: {
+        source_note_id: "source-note",
+        candidate_notes: [
+          { note_id: "candidate-z" },
+          { note_id: "candidate-a" },
+          { note_id: "candidate-b" }
+        ]
+      }
     });
 
     const modal = openedModals.at(-1);
     assert.ok(modal);
     assert.deepEqual(collectTextsByTag(modal.contentEl, "li"), [
-      "alpha -> beta (0.95)",
-      "alpha -> gamma (0.72)",
-      "delta -> epsilon (0.33)"
+      "candidate-a (0.95) - shared_project_context",
+      "candidate-b (0.72) - semantic_similarity",
+      "candidate-z (0.33) - weak_similarity"
     ]);
 
-    globalThis.prompt = () => "0.72";
     await plugin.commands.find((command) => command.id === "mind-lite-apply-links").callback();
 
     assert.deepEqual(fetchCalls[1], {
       url: "http://localhost:8000/links/apply",
       method: "POST",
-      body: { minimum_confidence: 0.72 }
+      body: {
+        source_note_id: "source-note",
+        links: [
+          { target_note_id: "candidate-a", confidence: 0.95 },
+          { target_note_id: "candidate-b", confidence: 0.72 },
+          { target_note_id: "candidate-z", confidence: 0.33 }
+        ],
+        min_confidence: 0.72
+      }
     });
+
+    assert.deepEqual(promptCalls, [
+      "Source note id",
+      "Candidate note ids (comma-separated)",
+      "Minimum confidence (0-1, optional)"
+    ]);
 
     console.log("Links commands test passed");
   } finally {
