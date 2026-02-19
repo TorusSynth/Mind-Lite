@@ -1,7 +1,7 @@
 # Mind Lite - API Specification v2.0 (Planning)
 
 **Status:** Implementation Active  
-**Last Updated:** 2026-02-18  
+**Last Updated:** 2026-02-19  
 **Base URL (target):** `http://localhost:8000`
 
 ---
@@ -14,7 +14,7 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 
 ---
 
-## Implementation Status (Phases A-B)
+## Implementation Status (Phases A-E)
 
 - Action-tiering contract implemented in `src/mind_lite/contracts/action_tiering.py`
 - Contract coverage added in `tests/contracts/test_action_tiering_policy.py`
@@ -88,6 +88,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
   - `links_propose` endpoint integrated with LLM-based link scoring
   - Anti-spam controls: confidence threshold (0.50), target saturation limit (3), max suggestions (10)
   - Graceful fallback on LLM failure (returns safe defaults)
+- **Phase E: Obsidian UX command coverage**
+  - Plugin command surface mapped to existing API endpoints (see command coverage table below)
+  - Daily and weekly review workflows wired to onboarding/run-history endpoints
+  - Plugin API client currently targets `http://localhost:8000` only (local API required)
 
 ---
 
@@ -127,6 +131,24 @@ Run locally with:
 Persist state across restarts with:
 
 `MIND_LITE_STATE_FILE=.mind_lite/state.json PYTHONPATH=src python3 -m mind_lite.api`
+
+### Obsidian Plugin Command Coverage (Phase E)
+
+The Obsidian plugin command set maps to the following API endpoints:
+
+| Command | Endpoint(s) |
+|---|---|
+| `Mind Lite: Analyze Folder` | `POST /onboarding/analyze-folder` |
+| `Mind Lite: Review Proposals` | `GET /runs/{run_id}/proposals` |
+| `Mind Lite: Apply Approved` | `POST /runs/{run_id}/apply` |
+| `Mind Lite: Rollback Last Batch` | `POST /runs/{run_id}/rollback` |
+| `Mind Lite: Propose Links` | `POST /links/propose` |
+| `Mind Lite: Apply Links` | `POST /links/apply` |
+| `Mind Lite: Daily Triage` | `POST /onboarding/analyze-folder` (active folder) |
+| `Mind Lite: Weekly Deep Review` | `GET /runs` |
+| `Mind Lite: Publish to GOM` | `POST /publish/prepare`, `POST /publish/score`, `POST /publish/mark-for-gom` |
+
+Localhost requirement: current plugin builds use a fixed base URL of `http://localhost:8000`, so the API must be reachable on the same machine.
 
 ---
 

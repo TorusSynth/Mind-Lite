@@ -1,7 +1,7 @@
 # Mind Lite - Capability Roadmap v2.0
 
 **Status:** Active  
-**Last Updated:** 2026-02-18  
+**Last Updated:** 2026-02-19  
 **Roadmap Style:** Capability-gated (not calendar-based)
 
 ---
@@ -127,6 +127,8 @@ Build an Obsidian-native, local-first second brain that:
 
 ## Phase E - Obsidian UX and Review Workflow
 
+**Progress:** Implemented (command surface and review workflow shipped in `obsidian-plugin/`).
+
 ### Scope
 - Command surface for analyze/review/apply/rollback
 - Batch approval by change type
@@ -134,9 +136,9 @@ Build an Obsidian-native, local-first second brain that:
 - Daily triage and weekly deep review commands
 
 ### Exit Criteria
-- Core command set finalized
-- Review panel states documented
-- Pilot review cycle usable end-to-end
+- Core command set finalized and mapped to API endpoints
+- Review panel states documented in plugin modal flows
+- Pilot review cycle usable end-to-end (analyze -> review -> apply/rollback)
 
 ---
 

@@ -1,7 +1,7 @@
 # Mind Lite - Technical Architecture v2.0
 
 **Status:** Implementation Active  
-**Last Updated:** 2026-02-18
+**Last Updated:** 2026-02-19
 
 ---
 
@@ -17,7 +17,7 @@ This document defines the system boundaries and major engines for Mind Lite v1. 
 
 ---
 
-## Implementation Status (Phases A-B)
+## Implementation Status (Phases A-E)
 
 Canonical endpoint-level implementation status is maintained in `API.md`.
 
@@ -36,6 +36,11 @@ Architecture-level milestones completed:
   - PARA classification LLM module (`organize/classify_llm.py`) with prompt building and response parsing
   - Link scoring LLM module (`links/propose_llm.py`) with anti-spam controls
   - Graceful degradation on LLM failure with safe defaults
+- **Phase E: Obsidian UX and review workflow**
+  - Obsidian plugin command surface implemented for analyze, review, apply, rollback, links, triage, deep review, and publish flows
+  - Review and run operations implemented with dedicated modals (`ReviewModal`, `RunHistoryModal`, `RollbackModal`, publish gate modals)
+  - Daily triage and weekly deep review workflows implemented on top of onboarding/run history endpoints
+  - Plugin API client currently targets local API only at `http://localhost:8000`
 
 ---
 
