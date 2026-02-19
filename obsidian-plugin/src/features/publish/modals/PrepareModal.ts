@@ -1,13 +1,13 @@
 import { App, Modal } from "obsidian";
-import { normalizePublishStage, type PublishPreparePayload, type PublishStage } from "../gom-flow";
+import { normalizePublishStage, type PublishPreparePayload } from "../gom-flow";
 
-type OnContinue = (stage: PublishStage) => void | Promise<void>;
+type OnContinue = (stage: string) => void | Promise<void>;
 
 export class PrepareModal extends Modal {
   private readonly payload: PublishPreparePayload;
   private readonly preparedContent: string;
   private readonly sanitized: boolean;
-  private readonly initialStage: PublishStage;
+  private readonly initialStage: string;
   private readonly onContinue: OnContinue;
 
   constructor(
@@ -15,7 +15,7 @@ export class PrepareModal extends Modal {
     payload: PublishPreparePayload,
     preparedContent: string,
     sanitized: boolean,
-    initialStage: PublishStage,
+    initialStage: string,
     onContinue: OnContinue
   ) {
     super(app);

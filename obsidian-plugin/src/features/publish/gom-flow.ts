@@ -44,7 +44,7 @@ export type GomPublishFlowResult = {
   draftId: string;
   target: string;
   preparedContent: string;
-  stage: PublishStage;
+  stage: string;
   gatePassed: boolean;
   markStatus: string | null;
   hardFailReasons: string[];
@@ -52,13 +52,17 @@ export type GomPublishFlowResult = {
   diagnostics: GateStageDiagnostic[];
 };
 
-export function normalizePublishStage(rawStage: string | null | undefined): PublishStage {
+export function normalizePublishStage(rawStage: string | null | undefined): string {
   const normalized = rawStage?.trim().toLowerCase();
-  if (normalized === "sprout" || normalized === "tree") {
+  if (normalized == null) {
+    return "seed";
+  }
+
+  if (normalized === "seed" || normalized === "sprout" || normalized === "tree") {
     return normalized;
   }
 
-  return "seed";
+  return normalized;
 }
 
 function deriveTitle(preparedContent: string, draftId: string): string {
@@ -81,7 +85,7 @@ export async function prepareDraftForGom(payload: PublishPreparePayload): Promis
 
 export async function runGomGateFlow(
   prepared: PublishPrepareResponse,
-  stage: PublishStage
+  stage: string
 ): Promise<GomPublishFlowResult> {
   const diagnostics: GateStageDiagnostic[] = [];
   diagnostics.push({
@@ -92,7 +96,7 @@ export async function runGomGateFlow(
 
   let scoreResult: PublishScoreResponse;
   try {
-    scoreResult = await apiPost<{ draft_id: string; content: string; stage: PublishStage }, PublishScoreResponse>(
+    scoreResult = await apiPost<{ draft_id: string; content: string; stage: string }, PublishScoreResponse>(
       "/publish/score",
       {
         draft_id: prepared.draft_id,

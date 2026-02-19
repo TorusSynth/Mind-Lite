@@ -295,7 +295,7 @@ async function run() {
     const gateFailModal = openedModals.at(-1);
     assert.ok(gateFailModal);
     assert.deepEqual(collectTextsByTag(gateFailModal.contentEl, "li"), [
-      "prepare: ok - target=gom, stage=seed, sanitized=yes",
+      "prepare: ok - target=gom, stage=invalid-stage, sanitized=yes",
       "score: ok - overall=0.45, gate_passed=false",
       "mark-for-revision: ok - queued_for_revision"
     ]);
@@ -345,7 +345,7 @@ async function run() {
       body: {
         draft_id: "draft-fail",
         content: "todo",
-        stage: "seed"
+        stage: "invalid-stage"
       }
     });
 
