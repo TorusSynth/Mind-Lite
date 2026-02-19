@@ -1304,6 +1304,59 @@ class HttpServerTests(unittest.TestCase):
         self.assertEqual(queue_body["count"], 1)
         self.assertEqual(queue_body["items"][0]["draft_id"], "draft_010")
 
+    def test_mark_for_revision_endpoint(self):
+        payload = {
+            "draft_id": "draft_011",
+            "title": "Project Atlas Revision",
+            "prepared_content": "Needs updates.",
+            "hard_fail_reasons": ["missing_citation"],
+            "recommended_actions": ["add_source_links"],
+        }
+
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/mark-for-revision",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        body = json.loads(resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(body["status"], "queued_for_revision")
+        self.assertEqual(body["draft_id"], "draft_011")
+
+    def test_revision_queue_endpoint(self):
+        payload = {
+            "draft_id": "draft_012",
+            "title": "Project Atlas Queue",
+            "prepared_content": "Pending revision.",
+            "hard_fail_reasons": ["sensitive_content"],
+            "recommended_actions": ["remove_secret"],
+        }
+
+        conn = HTTPConnection(self.host, self.port, timeout=2)
+        conn.request(
+            "POST",
+            "/publish/mark-for-revision",
+            body=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        mark_resp = conn.getresponse()
+        self.assertEqual(mark_resp.status, 200)
+        mark_resp.read()
+
+        conn.request("GET", "/publish/revision-queue")
+        queue_resp = conn.getresponse()
+        queue_body = json.loads(queue_resp.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(queue_resp.status, 200)
+        self.assertEqual(queue_body["count"], 1)
+        self.assertEqual(queue_body["items"][0]["draft_id"], "draft_012")
+
     def test_mark_for_gom_requires_prepared_content(self):
         conn = HTTPConnection(self.host, self.port, timeout=2)
         conn.request(
