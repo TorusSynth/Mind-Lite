@@ -299,7 +299,8 @@ async function run() {
       method: "POST",
       body: {
         draft_id: "draft-pass",
-        content: "# Weekly Update\n\nConcrete outcomes and next steps."
+        content: "# Weekly Update\n\nConcrete outcomes and next steps.",
+        stage: "seed"
       }
     });
     assert.deepEqual(fetchCalls[2], {
@@ -326,7 +327,8 @@ async function run() {
       method: "POST",
       body: {
         draft_id: "draft-fail",
-        content: "todo"
+        content: "todo",
+        stage: "seed"
       }
     });
 

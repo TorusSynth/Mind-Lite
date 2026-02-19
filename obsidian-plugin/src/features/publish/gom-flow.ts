@@ -75,9 +75,10 @@ export async function runGomGateFlow(
 
   let scoreResult: PublishScoreResponse;
   try {
-    scoreResult = await apiPost<{ draft_id: string; content: string }, PublishScoreResponse>("/publish/score", {
+    scoreResult = await apiPost<{ draft_id: string; content: string; stage: "seed" }, PublishScoreResponse>("/publish/score", {
       draft_id: prepared.draft_id,
-      content: prepared.prepared_content
+      content: prepared.prepared_content,
+      stage: "seed"
     });
   } catch (error) {
     diagnostics.push({

@@ -1202,6 +1202,7 @@ class HttpServerTests(unittest.TestCase):
         payload = {
             "draft_id": "draft_001",
             "content": "This is a clear project update with concrete outcomes and next steps." * 4,
+            "stage": "seed",
         }
         conn = HTTPConnection(self.host, self.port, timeout=2)
         conn.request(
@@ -1224,7 +1225,7 @@ class HttpServerTests(unittest.TestCase):
         conn.request(
             "POST",
             "/publish/score",
-            body=json.dumps({"draft_id": "draft_001"}),
+            body=json.dumps({"draft_id": "draft_001", "stage": "seed"}),
             headers={"Content-Type": "application/json"},
         )
         resp = conn.getresponse()
