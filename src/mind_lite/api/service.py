@@ -552,13 +552,37 @@ class ApiService:
                     "error": "retrieval_failed",
                 }
 
+        llm_result = None
+        llm_trace = {"provider": None, "model": None, "success": False, "error": None}
+        
+        try:
+            from mind_lite.llm import generate_answer, get_llm_config
+            llm_config = get_llm_config()
+            llm_result = generate_answer(query.strip(), citations, llm_config)
+            llm_trace = {
+                "provider": llm_result.get("provider"),
+                "model": llm_result.get("model"),
+                "success": llm_result.get("success", False),
+                "error": llm_result.get("error"),
+            }
+        except Exception as e:
+            llm_trace["error"] = str(e)
+
+        answer_text = f"Draft answer for: {query.strip()}"
+        answer_confidence = local_confidence
+        
+        if llm_result and llm_result.get("success"):
+            answer_text = llm_result.get("content", answer_text)
+            answer_confidence = 0.85
+
         response = {
             "answer": {
-                "text": f"Draft answer for: {query.strip()}",
-                "confidence": local_confidence,
+                "text": answer_text,
+                "confidence": answer_confidence,
             },
             "citations": citations,
             "retrieval_trace": retrieval_trace,
+            "llm_trace": llm_trace,
             "provider_trace": {
                 "initial": "local",
                 "provider": routing.provider,
@@ -1445,3 +1469,79 @@ class ApiService:
         self._ensure_rag_components()
         citations = self._rag_retrieval.retrieve(query.strip(), top_k=top_k)
         return {"citations": citations}
+
+    def llm_list_models(self) -> dict:
+        from mind_lite.llm.models import MODEL_CATALOG
+        return {"models": MODEL_CATALOG}
+
+    def llm_get_config(self) -> dict:
+        from mind_lite.llm.config import get_llm_config
+        config = get_llm_config()
+        return {
+            "active_provider": config.active_provider,
+            "active_model": config.active_model,
+            "has_openrouter_key": bool(config.openrouter_api_key),
+            "lmstudio_url": config.lmstudio_url,
+            "recently_used": config.recently_used,
+        }
+
+    def llm_set_config(self, payload: dict) -> dict:
+        from mind_lite.llm.config import get_llm_config, save_llm_config, LlmConfig
+        
+        provider = payload.get("provider")
+        model = payload.get("model")
+        
+        if provider not in ("lmstudio", "openrouter"):
+            raise ValueError("provider must be 'lmstudio' or 'openrouter'")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("model is required")
+        
+        current = get_llm_config()
+        
+        new_config = LlmConfig(
+            active_provider=provider,
+            active_model=model.strip(),
+            openrouter_api_key=current.openrouter_api_key,
+            lmstudio_url=current.lmstudio_url,
+            recently_used=current.recently_used,
+        )
+        save_llm_config(new_config)
+        
+        return {
+            "active_provider": new_config.active_provider,
+            "active_model": new_config.active_model,
+        }
+
+    def llm_set_api_key(self, payload: dict) -> dict:
+        from mind_lite.llm.config import get_llm_config, save_llm_config, LlmConfig
+        
+        api_key = payload.get("api_key")
+        if not isinstance(api_key, str):
+            raise ValueError("api_key must be a string")
+        
+        current = get_llm_config()
+        new_config = LlmConfig(
+            active_provider=current.active_provider,
+            active_model=current.active_model,
+            openrouter_api_key=api_key.strip(),
+            lmstudio_url=current.lmstudio_url,
+            recently_used=current.recently_used,
+        )
+        save_llm_config(new_config)
+        
+        return {"status": "saved", "has_key": bool(api_key.strip())}
+
+    def llm_clear_api_key(self) -> dict:
+        from mind_lite.llm.config import get_llm_config, save_llm_config, LlmConfig
+        
+        current = get_llm_config()
+        new_config = LlmConfig(
+            active_provider=current.active_provider,
+            active_model=current.active_model,
+            openrouter_api_key="",
+            lmstudio_url=current.lmstudio_url,
+            recently_used=current.recently_used,
+        )
+        save_llm_config(new_config)
+        
+        return {"status": "cleared"}

@@ -102,6 +102,13 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
   - Retrieval service with citations implemented in `src/mind_lite/rag/retrieval.py`
   - RAG API endpoints exposed: `/rag/index-vault`, `/rag/index-folder`, `/rag/status`, `/rag/retrieve`
   - `/ask` endpoint integrated with retrieval-backed citations
+- **LLM: Model Switching with OpenRouter**
+  - LLM module implemented in `src/mind_lite/llm/`
+  - Model catalog with Free/Local/Smart categories
+  - LM Studio client for local inference
+  - OpenRouter client for cloud models (300+ models including free tiers)
+  - `/ask` endpoint now calls configured LLM with RAG context
+  - Model configuration API: `/llm/models`, `/llm/config`
 
 ---
 
@@ -139,6 +146,11 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /rag/index-folder`
 - `GET /rag/status`
 - `POST /rag/retrieve`
+- `GET /llm/models`
+- `GET /llm/config`
+- `POST /llm/config`
+- `POST /llm/config/api-key`
+- `DELETE /llm/config/api-key`
 
 Run locally with:
 
@@ -503,6 +515,95 @@ Response:
       "score": 0.92
     }
   ]
+}
+```
+
+---
+
+## LLM Configuration and Model Switching
+
+### GET `/llm/models`
+List available models by category (Free, Local, Smart).
+
+Response:
+```json
+{
+  "models": {
+    "free": [
+      {"id": "openrouter/free", "name": "Auto (Best Free)", "context": 200000, "provider": "openrouter"},
+      {"id": "deepseek/deepseek-r1-0528:free", "name": "DeepSeek R1", "context": 164000, "provider": "openrouter"}
+    ],
+    "local": [
+      {"id": "lmstudio:local", "name": "LM Studio (Local)", "context": 128000, "provider": "lmstudio"}
+    ],
+    "smart": [
+      {"id": "anthropic/claude-opus-4.6", "name": "Claude Opus 4.6", "context": 200000, "provider": "openrouter"}
+    ]
+  }
+}
+```
+
+### GET `/llm/config`
+Get current LLM configuration.
+
+Response:
+```json
+{
+  "active_provider": "openrouter",
+  "active_model": "deepseek/deepseek-r1-0528:free",
+  "has_openrouter_key": true,
+  "lmstudio_url": "http://localhost:1234",
+  "recently_used": [
+    {"provider": "lmstudio", "model": "lmstudio:local"},
+    {"provider": "openrouter", "model": "anthropic/claude-opus-4.6"}
+  ]
+}
+```
+
+### POST `/llm/config`
+Set active model.
+
+Request:
+```json
+{
+  "provider": "openrouter",
+  "model": "deepseek/deepseek-r1-0528:free"
+}
+```
+
+Response:
+```json
+{
+  "active_provider": "openrouter",
+  "active_model": "deepseek/deepseek-r1-0528:free"
+}
+```
+
+### POST `/llm/config/api-key`
+Set OpenRouter API key.
+
+Request:
+```json
+{
+  "api_key": "sk-or-..."
+}
+```
+
+Response:
+```json
+{
+  "status": "saved",
+  "has_key": true
+}
+```
+
+### DELETE `/llm/config/api-key`
+Clear stored API key.
+
+Response:
+```json
+{
+  "status": "cleared"
 }
 ```
 

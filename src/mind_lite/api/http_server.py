@@ -60,6 +60,14 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, service.rag_status())
                 return
 
+            if path == "/llm/models":
+                self._write_json(200, service.llm_list_models())
+                return
+
+            if path == "/llm/config":
+                self._write_json(200, service.llm_get_config())
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "proposals":
                 run_id = run_route[0]
@@ -248,6 +256,24 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                 self._write_json(200, result)
                 return
 
+            if path == "/llm/config":
+                try:
+                    result = service.llm_set_config(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, result)
+                return
+
+            if path == "/llm/config/api-key":
+                try:
+                    result = service.llm_set_api_key(body)
+                except ValueError as exc:
+                    self._write_json(400, {"error": str(exc)})
+                    return
+                self._write_json(200, result)
+                return
+
             run_route = self._parse_run_route(path)
             if run_route is not None and run_route[1] == "apply":
                 run_id = run_route[0]
@@ -282,6 +308,16 @@ def create_server(host: str = "127.0.0.1", port: int = 8000, state_file: str | N
                     status = 404 if "unknown run id" in error_message else 400
                     self._write_json(status, {"error": error_message})
                     return
+                self._write_json(200, result)
+                return
+
+            self._write_json(404, {"error": "not found"})
+
+        def do_DELETE(self) -> None:  # noqa: N802
+            path = self.path.split("?", 1)[0]
+
+            if path == "/llm/config/api-key":
+                result = service.llm_clear_api_key()
                 self._write_json(200, result)
                 return
 

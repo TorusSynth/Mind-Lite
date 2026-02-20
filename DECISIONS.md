@@ -131,28 +131,32 @@ This document records key architectural decisions and their rationale. Each deci
 
 ---
 
-## ADR-005: LM Studio as Default, OpenAI as Fallback
+## ADR-005: LM Studio Local + OpenRouter Cloud with Model Switching
 
-**Decision:** Use LM Studio as the default local LLM provider, with OpenAI as guarded fallback.
+**Decision:** Use LM Studio as the default local LLM provider, with OpenRouter as cloud fallback. Users can switch between Free, Local, and Smart model categories.
 
-**Context:** Need an LLM for answer generation and extraction tasks.
+**Context:** Need an LLM for answer generation and extraction tasks, with flexibility to choose models based on cost, speed, and quality preferences.
 
 **Rationale:**
-- Local-first aligns with privacy and cost control goals
-- Fast interactive tuning for onboarding and organization workflows
-- OpenAI fallback covers hard cases and quality gaps
-- Clear policy controls for sensitivity and budget
+- Local-first (LM Studio) aligns with privacy and cost control goals
+- OpenRouter provides access to 300+ models including free tiers
+- Model switching allows users to choose based on task requirements:
+  - **Free**: Zero-cost cloud models (DeepSeek R1, Gemini Flash, Llama 3.3)
+  - **Local**: LM Studio running on user's machine
+  - **Smart**: Premium models for complex tasks (Claude Opus, GPT-5.2)
+- Single API key for all OpenRouter models
+- No vendor lock-in - easy to switch providers
 
 **Alternatives Considered:**
-- OpenAI default: higher consistency, but weaker local-first posture
-- Local-only with no fallback: lower cost, but lower resilience on hard tasks
-- Multi-cloud failover in v1: stronger resiliency, but unnecessary complexity
+- OpenAI-only: Simpler but more expensive, less model choice
+- Local-only: No fallback, limited by local hardware
+- Multi-provider (OpenAI + Anthropic + Google): More API keys, more complexity
 
 **Consequences:**
-- Requires local runtime setup (LM Studio)
-- Requires OpenAI API key only for fallback paths
-- Needs explicit routing policy, sensitivity gate, and budget controls
-- Improves portfolio signal for provider orchestration and safety engineering
+- Requires local runtime setup (LM Studio) for local models
+- Requires OpenRouter API key for cloud models
+- Model picker UI needed in Obsidian plugin
+- Configuration stored in `.mind_lite/llm_config.json`
 
 ---
 
@@ -312,13 +316,14 @@ This document records key architectural decisions and their rationale. Each deci
 | ADR-002 | 2026-02-17 | Qdrant for vectors | Accepted |
 | ADR-003 | 2026-02-17 | SQLite for storage | Accepted |
 | ADR-004 | 2026-02-17 | Sentence-transformers for embeddings | Accepted |
-| ADR-005 | 2026-02-18 | LM Studio default, OpenAI fallback | Accepted |
+| ADR-005 | 2026-02-20 | LM Studio + OpenRouter with model switching | Accepted |
 | ADR-006 | 2026-02-17 | 512-1024 token chunks | Accepted |
 | ADR-007 | 2026-02-17 | Docker Compose for deployment | Accepted |
 | ADR-008 | 2026-02-17 | Structured JSON logging | Accepted |
 | ADR-009 | 2026-02-17 | No auth in v1 | Accepted |
 | ADR-010 | 2026-02-17 | Obsidian plugin as primary GUI | Accepted |
 | ADR-011 | 2026-02-17 | Basic publishing pipeline in v1 | Accepted |
+| ADR-012 | 2026-02-20 | Dockerfile for containerized API | Accepted |
 
 ---
 
