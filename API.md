@@ -92,6 +92,16 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
   - Plugin command surface mapped to existing API endpoints (see command coverage table below)
   - Daily and weekly review workflows wired to onboarding/run-history endpoints
   - Plugin API client currently targets `http://localhost:8000` only (local API required)
+- **RAG: Full Architecture Implementation**
+  - Configuration module implemented in `src/mind_lite/rag/config.py`
+  - Chunking module with stable IDs implemented in `src/mind_lite/rag/chunking.py`
+  - SQLite provenance store implemented in `src/mind_lite/rag/sqlite_store.py`
+  - Local embedding adapter implemented in `src/mind_lite/rag/embeddings.py`
+  - Qdrant vector index adapter implemented in `src/mind_lite/rag/vector_index.py`
+  - Ingestion service implemented in `src/mind_lite/rag/indexing.py`
+  - Retrieval service with citations implemented in `src/mind_lite/rag/retrieval.py`
+  - RAG API endpoints exposed: `/rag/index-vault`, `/rag/index-folder`, `/rag/status`, `/rag/retrieve`
+  - `/ask` endpoint integrated with retrieval-backed citations
 
 ---
 
@@ -125,6 +135,10 @@ Implementation has started with a runnable local HTTP bootstrap and contract-bac
 - `POST /publish/export-for-gom`
 - `POST /publish/confirm-gom`
 - `GET /publish/revision-queue`
+- `POST /rag/index-vault`
+- `POST /rag/index-folder`
+- `GET /rag/status`
+- `POST /rag/retrieve`
 
 Run locally with:
 
@@ -384,13 +398,20 @@ Response:
 {
   "answer": {
     "text": "Focus on Project Atlas onboarding tasks...",
-    "citations": [
-      {
-        "note_id": "note_32",
-        "excerpt": "..."
-      }
-    ],
     "confidence": 0.79
+  },
+  "citations": [
+    {
+      "note_id": "notes/atlas.md",
+      "path": "notes/atlas.md",
+      "excerpt": "Onboarding tasks include...",
+      "chunk_id": "notes/atlas.md:0:abc123",
+      "score": 0.92
+    }
+  ],
+  "retrieval_trace": {
+    "available": true,
+    "retrieved_count": 1
   },
   "provider_trace": {
     "initial": "local",
@@ -398,6 +419,90 @@ Response:
     "fallback_provider": "openai",
     "fallback_reason": "low_confidence"
   }
+}
+```
+
+---
+
+## RAG Indexing and Retrieval
+
+### POST `/rag/index-vault`
+Index an entire vault for retrieval.
+
+Request:
+```json
+{
+  "vault_path": "/path/to/vault"
+}
+```
+
+Response:
+```json
+{
+  "files_indexed": 42,
+  "chunks_created": 150
+}
+```
+
+### POST `/rag/index-folder`
+Index a specific folder for retrieval.
+
+Request:
+```json
+{
+  "folder_path": "/path/to/vault/Projects"
+}
+```
+
+Response:
+```json
+{
+  "files_indexed": 12,
+  "chunks_created": 45
+}
+```
+
+### GET `/rag/status`
+Get RAG index status and statistics.
+
+Response:
+```json
+{
+  "documents_count": 42,
+  "chunks_count": 150,
+  "last_run": {
+    "run_type": "vault",
+    "files_indexed": 42,
+    "chunks_created": 150,
+    "status": "completed",
+    "started_at": "2026-02-20T10:30:00"
+  }
+}
+```
+
+### POST `/rag/retrieve`
+Retrieve relevant chunks for a query.
+
+Request:
+```json
+{
+  "query": "project atlas onboarding",
+  "top_k": 5
+}
+```
+
+Response:
+```json
+{
+  "citations": [
+    {
+      "note_id": "notes/atlas.md",
+      "path": "notes/atlas.md",
+      "excerpt": "Onboarding tasks for Atlas include...",
+      "chunk_id": "notes/atlas.md:0:abc123",
+      "score": 0.92
+    }
+  ]
 }
 ```
 

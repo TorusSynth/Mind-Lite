@@ -45,6 +45,15 @@ Architecture-level milestones completed:
   - Editorial gate checks hardened for publish readiness (metadata, sanitization, sensitivity/grounding hard-fails, stage thresholds)
   - Revision queue and publish queue separation enforced in gate outcomes and plugin publish-review flow
   - Revision queue status surfaced as an explicit "needs revision" path before publish eligibility
+- **RAG: Full Architecture Implementation**
+  - Configuration module with environment-backed defaults (`src/mind_lite/rag/config.py`)
+  - Deterministic chunking with stable IDs from path + index + content hash (`src/mind_lite/rag/chunking.py`)
+  - SQLite provenance store for documents, chunks, and ingestion runs (`src/mind_lite/rag/sqlite_store.py`)
+  - Local embedding adapter wrapping sentence-transformers (`src/mind_lite/rag/embeddings.py`)
+  - Qdrant vector index adapter for collection management and search (`src/mind_lite/rag/vector_index.py`)
+  - Ingestion service coordinating chunking, embeddings, and vector storage (`src/mind_lite/rag/indexing.py`)
+  - Retrieval service with citation assembly from SQLite + Qdrant (`src/mind_lite/rag/retrieval.py`)
+  - `/ask` endpoint integrated with retrieval-backed citations and graceful degradation
 
 ---
 
