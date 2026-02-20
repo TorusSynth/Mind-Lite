@@ -527,11 +527,38 @@ class ApiService:
             )
         )
 
+        citations: list[dict] = []
+        retrieval_trace: dict = {"available": False, "retrieved_count": 0}
+
+        rag_available = (
+            hasattr(self, "_rag_retrieval")
+            and self._rag_retrieval is not None
+            and hasattr(self, "_rag_sqlite_store")
+            and self._rag_sqlite_store is not None
+        )
+
+        if rag_available:
+            try:
+                retrieved = self._rag_retrieval.retrieve(query.strip(), top_k=5)
+                citations = retrieved
+                retrieval_trace = {
+                    "available": True,
+                    "retrieved_count": len(citations),
+                }
+            except Exception:
+                retrieval_trace = {
+                    "available": True,
+                    "retrieved_count": 0,
+                    "error": "retrieval_failed",
+                }
+
         response = {
             "answer": {
                 "text": f"Draft answer for: {query.strip()}",
                 "confidence": local_confidence,
             },
+            "citations": citations,
+            "retrieval_trace": retrieval_trace,
             "provider_trace": {
                 "initial": "local",
                 "provider": routing.provider,
