@@ -1335,3 +1335,86 @@ class ApiService:
         if current_folder.strip():
             return current_folder
         return "Resources"
+
+    def _ensure_rag_components(self) -> None:
+        if not hasattr(self, "_rag_sqlite_store") or self._rag_sqlite_store is None:
+            from mind_lite.rag.config import get_rag_config
+            from mind_lite.rag.sqlite_store import SqliteStore
+
+            cfg = get_rag_config()
+            self._rag_sqlite_store = SqliteStore(cfg.sqlite_path)
+            self._rag_sqlite_store.init_schema()
+
+        if not hasattr(self, "_rag_embedder") or self._rag_embedder is None:
+            from mind_lite.rag.config import get_rag_config
+            from mind_lite.rag.embeddings import EmbeddingAdapter
+
+            cfg = get_rag_config()
+            self._rag_embedder = EmbeddingAdapter(model_name=cfg.embed_model)
+
+        if not hasattr(self, "_rag_qdrant_index") or self._rag_qdrant_index is None:
+            from qdrant_client import QdrantClient
+            from mind_lite.rag.config import get_rag_config
+            from mind_lite.rag.vector_index import QdrantIndex
+
+            cfg = get_rag_config()
+            client = QdrantClient(url=cfg.qdrant_url)
+            self._rag_qdrant_index = QdrantIndex(client=client, collection_name=cfg.collection_name)
+            self._rag_qdrant_index.ensure_collection(vector_size=384)
+
+        if not hasattr(self, "_rag_retrieval") or self._rag_retrieval is None:
+            from mind_lite.rag.retrieval import RetrievalService
+
+            self._rag_retrieval = RetrievalService(
+                sqlite_store=self._rag_sqlite_store,
+                qdrant_index=self._rag_qdrant_index,
+                embedder=self._rag_embedder,
+            )
+
+        if not hasattr(self, "_rag_indexing") or self._rag_indexing is None:
+            from mind_lite.rag.indexing import IndexingService
+
+            self._rag_indexing = IndexingService(
+                sqlite_store=self._rag_sqlite_store,
+                qdrant_index=self._rag_qdrant_index,
+                embedder=self._rag_embedder,
+            )
+
+    def rag_index_vault(self, payload: dict) -> dict:
+        vault_path = payload.get("vault_path")
+        if not isinstance(vault_path, str) or not vault_path.strip():
+            raise ValueError("vault_path is required")
+
+        self._ensure_rag_components()
+        return self._rag_indexing.index_vault(vault_path.strip())
+
+    def rag_index_folder(self, payload: dict) -> dict:
+        folder_path = payload.get("folder_path")
+        if not isinstance(folder_path, str) or not folder_path.strip():
+            raise ValueError("folder_path is required")
+
+        self._ensure_rag_components()
+        return self._rag_indexing.index_folder(folder_path.strip())
+
+    def rag_status(self) -> dict:
+        self._ensure_rag_components()
+        return self._rag_sqlite_store.get_status_summary()
+
+    def rag_retrieve(self, payload: dict) -> dict:
+        query = payload.get("query")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+
+        top_k = payload.get("top_k", 5)
+        if not isinstance(top_k, int):
+            if isinstance(top_k, (float, str)):
+                try:
+                    top_k = int(top_k)
+                except (ValueError, TypeError):
+                    raise ValueError("top_k must be an integer")
+            else:
+                raise ValueError("top_k must be an integer")
+
+        self._ensure_rag_components()
+        citations = self._rag_retrieval.retrieve(query.strip(), top_k=top_k)
+        return {"citations": citations}
