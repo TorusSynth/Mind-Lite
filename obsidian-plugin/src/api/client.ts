@@ -13,7 +13,7 @@ export class APIError extends Error {
 }
 
 async function request<TResponse extends JSONValue>(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "DELETE",
   path: string,
   body?: JSONObject
 ): Promise<TResponse> {
@@ -41,4 +41,8 @@ export async function apiPost<TRequest extends JSONObject, TResponse extends JSO
   payload: TRequest
 ): Promise<TResponse> {
   return request<TResponse>("POST", path, payload);
+}
+
+export async function apiDelete<TResponse extends JSONValue>(path: string): Promise<TResponse> {
+  return request<TResponse>("DELETE", path);
 }

@@ -19,6 +19,7 @@ import { PrepareModal } from "./features/publish/modals/PrepareModal";
 import { getLastRunId, setLastRunId } from "./features/runs/history";
 import { parseRunHistoryEntries, RunHistoryModal } from "./features/runs/modals/RunHistoryModal";
 import { RollbackModal } from "./features/runs/modals/RollbackModal";
+import { ModelPickerModal } from "./features/llm/modals/ModelPickerModal";
 import { createErrorText } from "./modals/base";
 import type { JSONValue } from "./types/api";
 
@@ -255,6 +256,14 @@ export default class MindLitePlugin extends Plugin {
       name: "Mind Lite: Ping",
       callback: () => {
         new Notice("Mind Lite ping");
+      }
+    });
+
+    this.addCommand({
+      id: "mind-lite-switch-model",
+      name: "Mind Lite: Switch Model",
+      callback: () => {
+        new ModelPickerModal(this.app).open();
       }
     });
   }

@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mind-lite-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mind-lite-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MIND_LITE_QDRANT_URL=http://qdrant:6333
+      - MIND_LITE_STATE_FILE=/data/state.json
+      - MIND_LITE_RAG_SQLITE_PATH=/data/rag.db
+      - MIND_LITE_LMSTUDIO_URL=http://host.docker.internal:1234
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      - mind_lite_data:/data
+      - ${VAULT_PATH:-./vault}:/vault:ro
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  gom-preview:
+    image: nginx:alpine
+    container_name: mind-lite-gom
+    ports:
+      - "8080:80"
+    volumes:
+      - gom_published:/usr/share/nginx/html:ro
+    profiles:
+      - preview
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+  mind_lite_data:
+  gom_published:

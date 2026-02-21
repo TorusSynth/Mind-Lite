@@ -25,3 +25,76 @@
 .mind-lite-modal__action {
   min-width: 96px;
 }
+
+.mind-lite-model-picker h2 {
+  margin-bottom: 16px;
+}
+
+.mind-lite-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mind-lite-tab,
+.mind-lite-tab-active {
+  padding: 8px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--background-secondary);
+}
+
+.mind-lite-tab-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.mind-lite-model-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.mind-lite-model-item {
+  padding: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+}
+
+.mind-lite-model-item:last-child {
+  border-bottom: none;
+}
+
+.mind-lite-model-item:hover {
+  background: var(--background-secondary-alt);
+}
+
+.mind-lite-model-item.selected {
+  background: var(--background-primary-alt);
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.mind-lite-model-item.active {
+  background: var(--background-secondary);
+}
+
+.mind-lite-model-context {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.mind-lite-active-tag {
+  color: var(--text-success);
+  font-weight: bold;
+}
+
+.mind-lite-info {
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
