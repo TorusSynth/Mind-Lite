@@ -18,3 +18,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+  "integration: tests that require running services (qdrant, lm-studio, openrouter)",
+  "slow: tests that take longer than 5 seconds",
+]
