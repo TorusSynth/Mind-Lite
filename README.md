@@ -60,7 +60,7 @@ Choose between **Free**, **Local**, and **Smart** LLM categories:
 │   Obsidian Plugin (TypeScript)                                  │
 │   ├── Command palette integration                               │
 │   ├── Review/apply modals                                       │
-│   └── Model picker UI (coming soon)                             │
+│   └── Model picker UI                                           │
 │                                                                  │
 │   ─────────────────────────────────────────────────────────────  │
 │                                                                  │
@@ -203,6 +203,7 @@ Enable **Mind Lite** in Obsidian Community Plugins.
 
 | Command | Description |
 |---------|-------------|
+| `Mind Lite: Switch Model` | Choose between Free/Local/Smart models |
 | `Mind Lite: Analyze Folder` | Generate PARA classification proposals |
 | `Mind Lite: Review Proposals` | Review pending changes by risk tier |
 | `Mind Lite: Apply Approved` | Apply safe, approved changes |
@@ -300,9 +301,25 @@ MIND_LITE_STATE_FILE=.mind_lite/state.json
 
 ## Testing
 
-### Backend
+### Backend Unit Tests
 ```bash
 PYTHONPATH=src python3 -m unittest discover -q
+```
+
+### Integration Tests (requires running services)
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Start Qdrant
+docker run -d --name mind-lite-qdrant -p 6333:6333 qdrant/qdrant:latest
+
+# Run integration tests
+export MIND_LITE_QDRANT_URL=http://localhost:6333
+pytest -m integration tests/integration/ -v
+
+# Or skip integration tests
+SKIP_INTEGRATION=1 pytest tests/
 ```
 
 ### Obsidian Plugin
@@ -314,6 +331,26 @@ npm run verify
 ---
 
 ## Docker Deployment
+
+### Quick Start with Docker Compose
+
+```bash
+# One-command startup (Qdrant + API)
+docker compose up -d
+
+# With GOM preview (adds Nginx on port 8080)
+docker compose --profile preview up -d
+
+# View logs
+docker compose logs -f api
+```
+
+Services:
+- **qdrant** — Vector database on port 6333
+- **api** — Mind Lite API on port 8000
+- **gom-preview** — Nginx static server on port 8080 (optional)
+
+### Manual Docker Build
 
 Build and run with Docker:
 
@@ -341,7 +378,7 @@ docker run -d \
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design and components |
 | [ROADMAP.md](ROADMAP.md) | Feature progression and phases |
 | [DECISIONS.md](DECISIONS.md) | Architecture decision records |
-| [docs/MANUAL_TEST_PASS.md](docs/MANUAL_TEST_PASS.md) | Manual testing guide |
+| [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual testing guide |
 
 ---
 
@@ -357,6 +394,8 @@ docker run -d \
 | F | GOM Publishing & Editorial Gate | ✅ Complete |
 | RAG | Full Architecture | ✅ Complete |
 | LLM | Model Switching (OpenRouter + LM Studio) | ✅ Complete |
+| Tests | Integration Tests | ✅ Complete |
+| Docker | Docker Compose & GOM Adapters | ✅ Complete |
 
 ---
 
